@@ -1,0 +1,128 @@
+\documentclass[12pt]{article}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage[utf8]{inputenc}
+\usepackage{algpseudocode}
+\usepackage{algorithm}
+\usepackage{xcolor}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{definition}{Definition}
+\newtheorem{problem}{Problem}
+
+\newcommand\fran[1]{\textcolor{blue}{#1}}
+\newcommand\ffran[1]{\textcolor{blue}{\footnote{\fran{#1}}}}
+%\renewcommand\fran[1]{}
+%\renewcommand\ffran[1]{}
+
+\begin{document}
+
+\section{Problem Formulation}
+\label{sec:problem_formulation}
+
+Let $\Sigma$ be a system with the following dynamics\ffran{I'm not writing hybrid dynamics in the first draft, it should involve changes only in the low level planner I think}:
+
+\begin{equation}
+    \label{eq:sigma}
+    \begin{split}
+        \Sigma : \quad &\dot x = f(x, u) \\
+                       &u \in \mathcal{U}
+    \end{split}
+\end{equation}
+
+where $x \in \mathbb{R}^N$, $f$ is Lipschitz continuous and $\mathcal{U} \subset \mathbb{R}^M$ is a polytope\ffran{Set shape restrictions (polytopes) are given by dReal and our ability to check intersections with a line (for RRT)}. Let $G, B_i \subset \mathbb{R}^N$, for $i = 1..N_B$ be polytopes, $B = \cup_{i=1}^{N_B} B_i$\ffran{maybe change notation for $B$ to avoid confusing with balls} and $x_{init} \in \mathbb{R}^N$. We define the following problem:
+
+\begin{problem}\label{pr:reach}
+Find a control function, $u : \mathbb{R}^+ \rightarrow \mathcal{U}$ such that the system $\Sigma$ is steered from the initial state $x_{init}$ to some final state $x_{final} \in G$ in finite time $T$, subject to $x(t) \notin B, \forall t < T$.
+\end{problem}
+
+\section{Approach}
+\label{sec:approach}
+
+The solution is obtained by combining two planners: 
+
+\begin{itemize}
+    \item A high level planner obtains a list of waypoints through the state space from $x_{start}$ to $G$ while avoiding $B$. We call the resulting list of points the path plan.
+    \item A low level planner obtains a trajectory between each pair of waypoints. If the next waypoint is unreachable, it informs the high level planner so that a new path plan can be generated.
+\end{itemize}
+
+\subsection{High Level Planner}
+\label{sub:high_level_planner}
+
+We generate the path plan with the sample based path planning algorithm RRT (Rapidly exploring Random Tree)\ffran{In principle, one could use other random tree algorithms with minimal changes. Specially interesting would be the use of path planning algorithms that can handle temporal specifications, although it wouldn't be straight forward to adapt the interlevel interaction. More on this should be written at some point.}. \fran{Include description of RRT.}
+
+\subsection{Low Level Planner}
+\label{sub:low_level_planner}
+
+We use the SMT solver dReal to check the feasibility of the path plan. We choose not to require that the waypoints are precisely followed. Instead, we require the system to move through a ball around them. In detail, let $q$ be the last waypoint of the current path plan for which a trajectory has been generated and let $q'$ be the next waypoint. The system $\Sigma$ has a valid trajectory from $q$ to a ball around $q'$ (arriving ball) in finite time avoiding obstacles if the following formula is satisfied:\ffran{Maybe specifying this here is unncessary if we use dReach. Regardless, check if it is correct.}
+
+\begin{equation}
+    \label{eq:reach_check}
+    \begin{split}
+        &\exists q'_n \exists T \exists u \exists \epsilon \\
+        %\forall q_0 \bigg[
+        %    &q_0 \in B_{\epsilon_i}(q) \rightarrow \\
+        &\bigg(
+            q'_n = \int_{0}^{T} f(x, u) dx + q \land \\
+        &q'_n \in B_{\epsilon}(q') \land 
+            u \in \mathcal{U} \land
+            T < T_{max} \land
+            \epsilon < \epsilon_{max} \land \\
+        &\forall t \Big((t < T) \rightarrow 
+            (q'_t = \int_{0}^{t} f(x, u) dx + q \land 
+            q'_t \notin B )\Big)
+        \bigg)
+        %\bigg]
+    \end{split}
+\end{equation}
+
+In the above, $B_r(p)$ is the closed ball of radius $r$ and center $p$, $T_{max}$ is the maximum time allowed for the trajectory between waypoints and $\epsilon_{max}$ is the maximum radius allowed for the arriving ball. If \ref{eq:reach_check} is satisfiable, the SMT solver will obtain witnesses for the existentially qualified variables $q'_n, T, u$ and $\epsilon$. The point $q'_n$ will substitute the intended next waypoint $q'$ in the path plan, while $u$ and $T$ will become part of a piecewise constant control function.
+
+In the next subsection we consider the case where \ref{eq:reach_check} is not satisfiable.
+
+\fran{Would it be interesting to find the largest infeasible ball?}
+
+\subsection{Interlevel Interaction}
+\label{sub:interlevel_interaction}
+
+
+
+
+
+
+\iffalse
+In short, we've agreed on a plan to solve the hybrid system planning problem under non linear dynamics. The problem formulation would be something similar to what Sean described in an earlier email. The approach we'll use is a two level planner: the high level planner will obtain a tentative trajectory that will satisfy the goals of the scenario, while the low level planner will try to obtain a realization of the trajectory. The key interaction between the two will be the low level layer providing information in terms of additional constraints or goals to the high level layer. For example, the low level planner may place a virtual obstacle along a segment of the trajectory after detecting it's not feasible.
+
+We've proposed to focus on the high level planner and the interaction between the two in a first phase, using the current solution for one step reachability problems available in dReal as the low level layer. The high level layer will be implemented as an RRT-like sampled based planning algorithm. Each step of the trajectory will be checked with dReal, and the results will be used to guide the search in RRT. I'll list some rough ideas we discussed about this:
+
+- Temporal specs could be integrated to the high level algorithm with minimal to no changes to other parts of the algorithm.
+
+- Instead of following the trajectory point to point, it may be sufficient to stick to it up to some tolerance.
+
+- The high level layer may speak to the low level layer while generating the trajectory or after it has finished (we didn't talk about this I think, but I just realized it may be important).
+
+- The lower level can inform the high level in several ways. The ones we discussed were placing virtual obstacles and waypoints.
+
+- A different way the lower level can guide the search is by recursively calling the algorithm to solve the reachability problem. For example, It may be the case that different system modes are needed in order to overcome an obstacle in a trajectory step. In this case, we can see it as a new instance of the problem and run the algorithm recursively.
+
+Regarding the application area, it may be interesting to try to apply it to microrobots actuated by magnetic fields. We have a related project in the lab and there are labs at MIT working on similar projects.
+
+Finally, we came up with the following working plan:
+
+- Explore the literature on kynodynamic planning to better understand the usual problem formulations, existing methods and limitations.
+
+- Formalize the problem and the solution. Specifically, we should define the representation of a problem instance, choose an appropriate high level planning algorithm and design the interactions with the low level algorithm. We'll try to focus this step to the solution of the problem in the application area we'd choose. This will avoid getting lost in generalizations, while still making a significant contribution.
+
+- Implement the algorithm using dReal as the low level planner.
+
+- Test the performance of the algorithm.
+
+A key problem we may encounter is the fact that the low level planner performs poorly. We've discussed several approaches to improve what dReal does at this point but we've decided to leave it for a second phase of this project and focus on the high level planner first.
+\fi
+
+\end{document}
