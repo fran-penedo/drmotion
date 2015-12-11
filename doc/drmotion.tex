@@ -59,7 +59,7 @@ We generate the path plan with the sample based path planning algorithm RRT (Rap
 \subsection{Low Level Planner}
 \label{sub:low_level_planner}
 
-We use the SMT solver dReal to check the feasibility of the path plan. We choose not to require that the waypoints are precisely followed. Instead, we require the system to move through a ball around them. In detail, let $q$ be the last waypoint of the current path plan for which a trajectory has been generated and let $q'$ be the next waypoint. The system $\Sigma$ has a valid trajectory from $q$ to a ball around $q'$ (arriving ball) in finite time avoiding obstacles if the following formula is satisfied:\ffran{Maybe specifying this here is unncessary if we use dReach. Regardless, check if it is correct.}
+We use the SMT solver dReal to check the feasibility of the path plan. We choose not to require that the waypoints are precisely followed. Instead, we require the system to move through a ball around them. In detail, let $q$ be the last waypoint of the current path plan for which a trajectory has been generated and let $q'$ be the next waypoint. The system $\Sigma$ has a valid trajectory from $q$ to a ball around $q'$ (arriving ball) in finite time avoiding obstacles if the following formula is satisfied:\ffran{Maybe specifying this here is unnecessary if we use dReach. Regardless, check if it is correct.}
 
 \begin{equation}
     \label{eq:reach_check}
@@ -90,9 +90,22 @@ In the next subsection we consider the case where \ref{eq:reach_check} is not sa
 \subsection{Interlevel Interaction}
 \label{sub:interlevel_interaction}
 
+Assume a trajectory is not feasible between the waypoints $q$ and $q'$. From the point of view of the high level planner, it is as if an invisible obstacle was placed between the points. We call such an obstacle a virtual obstacle and we denote them by $B^*_i$, where $i \in \mathbb{N}$ is its index. We want to create a virtual obstacle at some point between $q$ and $q'$ such that the high level planner is unable to select a point within the maximum arrival ball defined previously while blocking as less as possible other paths. Let $v = q' - q$, $\lambda \in (0, 1)$ and $\mathcal{B}$ be an orthonormal basis for $Span(\{v\})^{\bot}$. We define the following virtual obstacle:
+
+\begin{equation}
+    \label{eq:virtual_obst}
+    \begin{split}
+        B^*_i : \quad \{x \in \mathbb{R} \mid &v'x - v'q - \lambda \|v\|^2 > 0, \\
+                                              &v'x - v'q - (\lambda - \delta / \|v\|) \|v\|^2 < 0, \\
+                                              &v_i'x - v_i'q - \lambda\epsilon_{max} < 0, \\
+                                              &v_i'x - v_i'q + \lambda\epsilon_{max} > 0, \text{for } v_i \in \mathcal{B} \}
+    \end{split}
+\end{equation}
+
+The polytope $B^*_i$ as defined above is a prismatic polytope with a hypercubic base, oriented as given by $\mathcal{B}$ and side length equal to $2 \lambda \epsilon_{max}$, translated a distance $\delta$ into the remaining dimension. The center of the base is located in the point $q + \lambda v$ and the translation is towards $q'$. A graphical representation in two dimensions can be seen in Figure~\ref{fig:}. Note that the side length of the base has been chosen so that every line from $q'$ to $B_{\epsilon_{max}}(q')$ intersects with $B^*_i$. Also note that for $\lambda = 1 - \epsilon / \|v\|$, the base of the prism is tangent to the ball.
 
 
-
+\fran{It may be overkill to block the whole ball. In principle, if placed tangent it shouldn't block any point that is not on the ball from $q$, since any point between the obstacle and the ball would be covered by a ball centered in a point in the boundary of the obstacle, which RRT could choose. However, it seems to block paths between points near $q$ and points near $q'$. I don't think it's possible to avoid this kind of conservatism, but it should be explored at some point how to mitigate it.}
 
 
 \iffalse
