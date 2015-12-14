@@ -15,6 +15,8 @@
 \newtheorem{definition}{Definition}
 \newtheorem{problem}{Problem}
 
+\DeclareMathOperator*{\argmin}{arg\,min}
+
 \newcommand\fran[1]{\textcolor{blue}{#1}}
 \newcommand\ffran[1]{\textcolor{blue}{\footnote{\fran{#1}}}}
 %\renewcommand\fran[1]{}
@@ -54,7 +56,15 @@ The solution is obtained by combining two planners:
 \subsection{High Level Planner}
 \label{sub:high_level_planner}
 
-We generate the path plan with the sample based path planning algorithm RRT (Rapidly exploring Random Tree)\ffran{In principle, one could use other random tree algorithms with minimal changes. Specially interesting would be the use of path planning algorithms that can handle temporal specifications, although it wouldn't be straight forward to adapt the interlevel interaction. More on this should be written at some point.}. \fran{Include description of RRT.}
+We generate the path plan with the sample based path planning algorithm RRT (Rapidly exploring Random Tree)\ffran{In principle, one could use other random tree algorithms with minimal changes. Specially interesting would be the use of path planning algorithms that can handle temporal specifications, although it wouldn't be straight forward to adapt the interlevel interaction. More on this should be written at some point.}. This algorithm creates a tree structure, $Q = (V, E)$, over points in the state space, with the root being $x_{init}$. $V$ is the set of vertices of the tree, which we also call waypoints, and $E \subset V \times V$ is the set of edges. Once a point in $G$ is added to the tree, a path from $x_{init}$ to $G$ can be obtained. The growing process is as follows:
+
+\begin{enumerate}
+    \item Obtain a random sample $q_r \in \mathbb{R}^N$.
+    \item Find the nearest vertex in the tree $q_v = \argmin_{q \in V} \|q - q_r\|$.
+    \item Let $q_n = q_v + \Delta q \frac{q_r - q_v}{\|q_r - q_v\|}$. If $CollFree(q_v, q_n)$, we add $q_n$ to the set of vertices $V$ and the edge $(q_v, q_n)$ to $E$. Otherwise, we resample.
+\end{enumerate}
+
+In the above, $\Delta q$ is a parameter of the algorithm that fixes the traveled distance between waypoints, and $CollFree(q_v, q_n) = \forall \lambda \in [0, 1], \lambda q_v + (1 - \lambda) q_n \notin B$ is a predicate that checks if the line corresponding to the new edge intersects with obstacles.
 
 \subsection{Low Level Planner}
 \label{sub:low_level_planner}
@@ -108,27 +118,21 @@ The polytope $B^*_i$ as defined above is a prismatic polytope with a hypercubic 
 
 \fran{I'd like to formalize a bit better the new problem for the high level planner, so that it is clear that we add the virtual obstacle to the set of obstacles just for RRT but not for dReal}
 
-Once the path between $q$ and $q'$ is made unfeasible for the high level planner, the edge between them is removed from the tree and a new path plan needs to be generated. We present a strategy that tries to reuse the previous information gathered by RRT. Let $Q_C$ be the subtree of waypoints corresponding to the section of the old path plan that has already been checked by the low level planner, $Q$ be the maximal subtree in which $Q_C$ is contained and $Q_D$ the remaining subtree. Consider the following set of waypoint pairs:
+Once the path between $q$ and $q'$ is made unfeasible for the high level planner, the edge between them is removed from the tree and a new path plan needs to be generated. We present a strategy that tries to reuse the previous information gathered by RRT. Let $Q_C = (V_C, E_C)$ be the subtree of waypoints corresponding to the section of the old path plan that has already been checked by the low level planner, $Q = (V, E)$ be the maximal subtree in which $Q_C$ is contained and $Q_D = (V_D, E_D)$ the remaining subtree. Consider the following set of waypoint pairs:
 
 \begin{equation}
     \label{eq:checked_candidates}
-    V_C = \{(p, p') \mid p \in Q_C, p' \in Q_D, \|p - p'\| < \mu \Delta x\}
+    V_N = \{(p, p') \mid p \in V_C, p' \in V_D, \|p - p'\| < \mu \Delta q, CollFree(p, p')\}
 \end{equation}
 
-\fran{$Q_C, Q_D$ should be the nodes in the graph, not the graph itself, fix when RRT section is written and we have a notation for this.}
-
-\fran{This is not complete, it is missing the condition ensuring there is a line between $p$ and $p'$. We'll probably have notation from that in the RRT section, so we'll add it later.}
-
-In the above, we consider possible edges to add to the graph so that it becomes connected again, the added pair has a distance less than some small factor $\mu > 1$ of $\Delta x$, which is the moving distance parameter from RRT, and part of the path plan has already been computed. If $V_C = \emptyset$, we look for candidate pairs between $Q$ and $Q_D$:
+In the above, we consider possible edges to add to the graph so that it becomes connected again, the added pair has a distance less than some small factor $\mu > 1$ of $\Delta q$, which is the moving distance parameter from RRT, and part of the path plan has already been computed. If $V_N = \emptyset$, we look for candidate pairs between $Q$ and $Q_D$:
 
 \begin{equation}
     \label{eq:unchecked_candidates}
-    V_C' = \{(p, p') \mid p \in Q \setminus Q_C, p' \in Q_D, \|p - p'\| < \mu \Delta x\}
+    V_N' = \{(p, p') \mid p \in V \setminus V_C, p' \in V_D, \|p - p'\| < \mu \Delta q\}
 \end{equation}
 
-\fran{same comments here}
-
-Note that checking $V_C$ before $V_C'$ is just a heuristic: it is possible that the length of the path obtained when using an edge from $V_C$ is so much longer that the amount of computation done by the lower level planner increases, compared to a path resulting from introducing an edge from $V_C'$. If $V_C'$ is also empty, we cannot reconnect the two subtrees with the given distance constraint, so a new tree needs to be generated. We restart RRT using $Q$ as an initial graph so at least that amount of computation is carried over.
+Note that checking $V_N$ before $V_N'$ is just a heuristic: it is possible that the length of the path obtained when using an edge from $V_N$ is so much longer that the amount of computation done by the lower level planner increases, compared to a path resulting from introducing an edge from $V_N'$. If $V_N'$ is also empty, we cannot reconnect the two subtrees with the given distance constraint, so a new tree needs to be generated. We restart RRT using $Q$ as an initial graph so at least that amount of computation is carried over.
 
 \fran{It would be interesting to explore heuristics that try to avoid trying to connect points near $q$ to points near $q'$, although I'm not sure if it even makes sense}
 
