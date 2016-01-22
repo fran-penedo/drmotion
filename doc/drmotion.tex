@@ -27,17 +27,17 @@
 \section{Problem Formulation}
 \label{sec:problem_formulation}
 
-Let $\Sigma$ be a system with the following dynamics\ffran{I'm not writing hybrid dynamics in the first draft, it should involve changes only in the low level planner I think}:
+Let $\Sigma$ be a switched system with the following dynamics:
 
 \begin{equation}
     \label{eq:sigma}
     \begin{split}
-        \Sigma : \quad &\dot x = f(x, u) \\
-                       &u \in \mathcal{U}
+        \Sigma : \quad &\dot x = f_i(x, u) \\
+                       &u \in \mathcal{U}, x \in \mathcal{X}_i, i \in I
     \end{split}
 \end{equation}
 
-where $x \in \mathbb{R}^N$, $f$ is Lipschitz continuous and $\mathcal{U} \subset \mathbb{R}^M$ is a polytope\ffran{Set shape restrictions (polytopes) are given by dReal and our ability to check intersections with a line (for RRT)}. Let $G, B_i \subset \mathbb{R}^N$, for $i = 1..N_B$ be polytopes, $B = \cup_{i=1}^{N_B} B_i$\ffran{maybe change notation for $B$ to avoid confusing with balls} and $x_{init} \in \mathbb{R}^N$. We define the following problem:
+where $\{X_i\}_{i \in I}$ is a partition of $\mathbb{R}$, $f_i$ is Lipschitz continuous for all $i \in I$, and $\mathcal{U} \subset \mathbb{R}^M$ is a polytope\ffran{Set shape restrictions (polytopes) are given by dReal and our ability to check intersections with a line (for RRT)}. Let $G, B_i \subset \mathbb{R}^N$, for $i = 1..N_B$ be polytopes, $B = \cup_{i=1}^{N_B} B_i$\ffran{maybe change notation for $B$ to avoid confusing with balls} and $x_{init} \in \mathbb{R}^N$. We define the following problem:
 
 \begin{problem}\label{pr:reach}
 Find a control function, $u : \mathbb{R}^+ \rightarrow \mathcal{U}$ such that the system $\Sigma$ is steered from the initial state $x_{init}$ to some final state $x_{final} \in G$ in finite time $T$, subject to $x(t) \notin B, \forall t < T$.
@@ -69,7 +69,7 @@ In the above, $\Delta q$ is a parameter of the algorithm that fixes the traveled
 \subsection{Low Level Planner}
 \label{sub:low_level_planner}
 
-We use the SMT solver dReal to check the feasibility of the path plan. We choose not to require that the waypoints are precisely followed. Instead, we require the system to move through a ball around them. In detail, let $q$ be the last waypoint of the current path plan for which a trajectory has been generated and let $q'$ be the next waypoint. The system $\Sigma$ has a valid trajectory from $q$ to a ball around $q'$ (arriving ball) in finite time avoiding obstacles if the following formula is satisfied:\ffran{Maybe specifying this here is unnecessary if we use dReach. Regardless, check if it is correct.}
+We use the SMT solver dReal to check the feasibility of the path plan. We choose not to require that the waypoints are precisely followed. Instead, we require the system to move through a ball around them. In detail, let $q$ be the last waypoint of the current path plan for which a trajectory has been generated and let $q'$ be the next waypoint. The system $\Sigma$ has a valid trajectory from $q$ to a ball around $q'$ (arriving ball) in finite time avoiding obstacles if the following formula is satisfied:\ffran{This is written for a non hybrid system. I'll leave the jumps until I'm sure this is correct.}
 
 \begin{equation}
     \label{eq:reach_check}
