@@ -27,20 +27,29 @@
 \section{Problem Formulation}
 \label{sec:problem_formulation}
 
-Let $\Sigma$ be a switched system with the following dynamics:
+Let $\Sigma$ be a robot manipulator with the following dynamics:
 
 \begin{equation}
     \label{eq:sigma}
     \begin{split}
-        \Sigma : \quad &\dot x = f_i(x, u) \\
-                       &u \in \mathcal{U}, x \in \mathcal{X}_i, i \in I
+        \Sigma : \quad &\left [ \begin{matrix} q \\ \dot q \end{matrix}\right ] = 
+                        \left [ \begin{matrix}
+                                \dot q \\ - M^{-1}(q) N(q, \dot q)
+                        \end{matrix}\right ] + 
+                        \left [ \begin{matrix}
+                                0 \\ M^{-1}(q)
+                        \end{matrix} \right ] \tau \\
+                        &\tau_i \in [\tau_i^{min}, \tau_i^{max}], q_i \in [q_i^{min}, q_i^{max}],
+                        \dot q_i \in [\dot q_i^{min}, \dot q_i^{max}]
     \end{split}
 \end{equation}
 
-where $\{X_i\}_{i \in I}$ is a partition of $\mathbb{R}$, $f_i$ is Lipschitz continuous for all $i \in I$, and $\mathcal{U} \subset \mathbb{R}^M$ is a polytope\ffran{Set shape restrictions (polytopes) are given by dReal and our ability to check intersections with a line (for RRT)}. Let $G, B_i \subset \mathbb{R}^N$, for $i = 1..N_B$ be polytopes, $B = \cup_{i=1}^{N_B} B_i$\ffran{maybe change notation for $B$ to avoid confusing with balls} and $x_{init} \in \mathbb{R}^N$. We define the following problem:
+where $q \in \mathbb{R}^n$ is the joint space state variable (i.e., the joint angles and offsets), $\tau \in \mathbb{R}^n$ is the applied joint torque/force input vector, $M(q)$ is a symmetric positive definite inertia matrix, $N(q, \dot q)$ is a matrix representing nonlinear terms and the subscript in the state and input variables represent the respective component. The $M$ and $N$ matrices are given by the specifications of the manipulator.
+
+Let $y_{goal} \in \mathbb{R}^3$ be a point in the workspace, $G \subset \mathbb{R}^n$ be the subset of the joint space that results in the end of the arm being at $y_{goal}$\ffran{It should be easy to also specify the orientation of the last frame, but I still lack the knowledge to write it properly. I'm also not specifying exactly how to do the transformation, but, from an implementation point of view, that seems to be a common primitive included in the software. I'm also considering only a single goal point in the workspace, mostly because I don't know how to find a conservative approximation of the corresponding set in the joint space.}, and $q_{start} \in \mathbb{R}^n$ be an initial joint state. We define the following problem:
 
 \begin{problem}\label{pr:reach}
-Find a control function, $u : \mathbb{R}^+ \rightarrow \mathcal{U}$ such that the system $\Sigma$ is steered from the initial state $x_{init}$ to some final state $x_{final} \in G$ in finite time $T$, subject to $x(t) \notin B, \forall t < T$.
+Find a control function, $u : \mathbb{R}^+ \rightarrow \mathcal{U}$ such that the system $\Sigma$ is steered from the initial state $q_{start}$ to some final state $q_{goal} \in G$ in finite time $T$.
 \end{problem}
 
 \section{Approach}
@@ -49,14 +58,14 @@ Find a control function, $u : \mathbb{R}^+ \rightarrow \mathcal{U}$ such that th
 The solution is obtained by combining two planners: 
 
 \begin{itemize}
-    \item A high level planner obtains a list of waypoints through the state space from $x_{start}$ to $G$ while avoiding $B$. We call the resulting list of points the path plan.
+    \item A high level planner obtains a list of waypoints through the state space from $q_{start}$ to $G$. We call the resulting list of points the path plan.
     \item A low level planner obtains a trajectory between each pair of waypoints. If the next waypoint is unreachable, it informs the high level planner so that a new path plan can be generated.
 \end{itemize}
 
 \subsection{High Level Planner}
 \label{sub:high_level_planner}
 
-We generate the path plan with the sample based path planning algorithm RRT (Rapidly exploring Random Tree)\ffran{In principle, one could use other random tree algorithms with minimal changes. Specially interesting would be the use of path planning algorithms that can handle temporal specifications, although it wouldn't be straight forward to adapt the interlevel interaction. More on this should be written at some point.}. This algorithm creates a tree structure, $Q = (V, E)$, over points in the state space, with the root being $x_{init}$. $V$ is the set of vertices of the tree, which we also call waypoints, and $E \subset V \times V$ is the set of edges. Once a point in $G$ is added to the tree, a path from $x_{init}$ to $G$ can be obtained. The growing process is as follows:
+We generate the path plan with the sample based path planning algorithm RRT (Rapidly exploring Random Tree)\ffran{In principle, one could use other random tree algorithms with minimal changes. Specially interesting would be the use of path planning algorithms that can handle temporal specifications, although it wouldn't be straight forward to adapt the interlevel interaction. More on this should be written at some point.}. This algorithm creates a tree structure, $Q = (V, E)$, over points in the state space, with the root being $q_{init}$. $V$ is the set of vertices of the tree, which we also call waypoints, and $E \subset V \times V$ is the set of edges. Once a point in $G$ is added to the tree, a path from $q_{init}$ to $G$ can be obtained. The growing process is as follows:
 
 \begin{enumerate}
     \item Obtain a random sample $q_r \in \mathbb{R}^N$.
@@ -64,7 +73,7 @@ We generate the path plan with the sample based path planning algorithm RRT (Rap
     \item Let $q_n = q_v + \Delta q \frac{q_r - q_v}{\|q_r - q_v\|}$. If $CollFree(q_v, q_n)$, we add $q_n$ to the set of vertices $V$ and the edge $(q_v, q_n)$ to $E$. Otherwise, we resample.
 \end{enumerate}
 
-In the above, $\Delta q$ is a parameter of the algorithm that fixes the traveled distance between waypoints, and $CollFree(q_v, q_n) = \forall \lambda \in [0, 1], \lambda q_v + (1 - \lambda) q_n \notin B$ is a predicate that checks if the line corresponding to the new edge intersects with obstacles.
+In the above, $\Delta q$ is a parameter of the algorithm that fixes the traveled distance between waypoints, and $CollFree(q_v, q_n) = \forall \lambda \in [0, 1], \lambda q_v + (1 - \lambda) q_n \notin B$, with $B \in \mathbb{R}^n$ a set of obstacles (which may be present even if the problem formulation does not include them) is a predicate that checks if the line corresponding to the new edge intersects with obstacles.
 
 \subsection{Low Level Planner}
 \label{sub:low_level_planner}
