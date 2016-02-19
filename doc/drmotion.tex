@@ -27,58 +27,62 @@
 \section{Problem Formulation}
 \label{sec:problem_formulation}
 
-Let $\Sigma$ be a robot manipulator with the following dynamics:
+Let $\Sigma$ be a system with the following dynamics:
 
 \begin{equation}
     \label{eq:sigma}
     \begin{split}
-        \Sigma : \quad &\left [ \begin{matrix} q \\ \dot q \end{matrix}\right ] = 
-                        \left [ \begin{matrix}
-                                \dot q \\ - M^{-1}(q) N(q, \dot q)
-                        \end{matrix}\right ] + 
-                        \left [ \begin{matrix}
-                                0 \\ M^{-1}(q)
-                        \end{matrix} \right ] \tau \\
-                        &\tau_i \in [\tau_i^{min}, \tau_i^{max}], q_i \in [q_i^{min}, q_i^{max}],
-                        \dot q_i \in [\dot q_i^{min}, \dot q_i^{max}]
+        \Sigma : \quad &\dot x = f(x, u) \\
+                       &u \in \mathcal{U}
     \end{split}
 \end{equation}
 
-where $q \in \mathbb{R}^n$ is the joint space state variable (i.e., the joint angles and offsets), $\tau \in \mathbb{R}^n$ is the applied joint torque/force input vector, $M(q)$ is a symmetric positive definite inertia matrix, $N(q, \dot q)$ is a matrix representing nonlinear terms and the subscript in the state and input variables represent the respective component. The $M$ and $N$ matrices are given by the specifications of the manipulator.
+where $x \in \mathcal{X} \subset \mathbb{R}^N$, with $\mathcal{X}$ a polytope, $f$ is Lipschitz continuous and $\mathcal{U} \subset \mathbb{R}^M$ is a polytope\ffran{Set shape restrictions (polytopes) are given by dReal and our ability to check intersections with a line (for RRT)}. Let $G, B_i \subset \mathbb{R}^N$, for $i = 1..N_B$ be polytopes, $B = \cup_{i=1}^{N_B} B_i$\ffran{maybe change notation for $B$ to avoid confusing with balls}, $W = \mathcal{X} \setminus B$ and $x_{init} \in W$. We define the following informal predicate about $\Sigma$:
 
-Let $y_{goal} \in \mathbb{R}^3$ be a point in the workspace, $G \subset \mathbb{R}^n$ be the subset of the joint space that results in the end of the arm being at $y_{goal}$\ffran{It should be easy to also specify the orientation of the last frame, but I still lack the knowledge to write it properly. I'm also not specifying exactly how to do the transformation, but, from an implementation point of view, that seems to be a common primitive included in the software. I'm also considering only a single goal point in the workspace, mostly because I don't know how to find a conservative approximation of the corresponding set in the joint space.}, and $q_{start} \in \mathbb{R}^n$ be an initial joint state. We define the following problem:
+\begin{equation}
+    \begin{split}
+        \phi &:= \exists u \psi (u) \\
+        \psi(u) &:=  \parbox[t]{11cm}{$u$ is a piecewise constant function, $u : \mathbb{R}^+ \rightarrow \mathcal{U}$, such that the system $\Sigma$ is steered from the initial state $x_{init}$ to some final state $x_{final} \in G$ in finite time $T$, subject to $x(t) \in \mathcal{X} \setminus B, \forall t < T$.}
+    \end{split}
+\end{equation}
+
+We are interested in the following problem:
 
 \begin{problem}\label{pr:reach}
-Find a control function, $u : \mathbb{R}^+ \rightarrow \mathcal{U}$ such that the system $\Sigma$ is steered from the initial state $q_{start}$ to some final state $q_{goal} \in G$ in finite time $T$.
+    Check whether predicate $\phi$ is satisfiable or not. If it is, obtain a witness control function $u_0$ such that $\psi(u_0)$ is true.
 \end{problem}
+
+\fran{At some point we need to state the precision of dreal and the fact that rrt is stochastic, so we may want to formulate relaxations of the problem. The precision is a technical issue, while the stochasticity might not be a problem at all if we rely on the solver after some prespecified number of iterations of rrt}
 
 \section{Approach}
 \label{sec:approach}
 
-The solution is obtained by combining two planners: 
+The solution is obtained by combining two planners:
 
 \begin{itemize}
-    \item A high level planner obtains a list of waypoints through the state space from $q_{start}$ to $G$. We call the resulting list of points the path plan.
+    \item A high level planner obtains a list of waypoints through the state space from $x_{start}$ to $G$ while avoiding $B$. We call the resulting list of points the path plan.
     \item A low level planner obtains a trajectory between each pair of waypoints. If the next waypoint is unreachable, it informs the high level planner so that a new path plan can be generated.
 \end{itemize}
 
 \subsection{High Level Planner}
 \label{sub:high_level_planner}
 
-We generate the path plan with the sample based path planning algorithm RRT (Rapidly exploring Random Tree)\ffran{In principle, one could use other random tree algorithms with minimal changes. Specially interesting would be the use of path planning algorithms that can handle temporal specifications, although it wouldn't be straight forward to adapt the interlevel interaction. More on this should be written at some point.}. This algorithm creates a tree structure, $Q = (V, E)$, over points in the state space, with the root being $q_{init}$. $V$ is the set of vertices of the tree, which we also call waypoints, and $E \subset V \times V$ is the set of edges. Once a point in $G$ is added to the tree, a path from $q_{init}$ to $G$ can be obtained. The growing process is as follows:
+We generate the path plan with the sample based path planning algorithm RRT (Rapidly exploring Random Tree)\ffran{In principle, one could use other random tree algorithms with minimal changes. Specially interesting would be the use of path planning algorithms that can handle temporal specifications, although it wouldn't be straight forward to adapt the interlevel interaction. More on this should be written at some point.}. This algorithm creates a tree structure, $Q = (V, E)$, over points in the state space, with the root being $x_{init}$. $V$ is the set of vertices of the tree, which we also call waypoints, and $E \subset V \times V$ is the set of edges. Once a point in $G$ is added to the tree, a path from $x_{init}$ to $G$ can be obtained. The growing process is as follows:
 
 \begin{enumerate}
-    \item Obtain a random sample $q_r \in \mathbb{R}^N$.
+    \item Obtain a random sample $q_r \in \mathcal{X}$.
     \item Find the nearest vertex in the tree $q_v = \argmin_{q \in V} \|q - q_r\|$.
     \item Let $q_n = q_v + \Delta q \frac{q_r - q_v}{\|q_r - q_v\|}$. If $CollFree(q_v, q_n)$, we add $q_n$ to the set of vertices $V$ and the edge $(q_v, q_n)$ to $E$. Otherwise, we resample.
 \end{enumerate}
 
-In the above, $\Delta q$ is a parameter of the algorithm that fixes the traveled distance between waypoints, and $CollFree(q_v, q_n) = \forall \lambda \in [0, 1], \lambda q_v + (1 - \lambda) q_n \notin B$, with $B \in \mathbb{R}^n$ a set of obstacles (which may be present even if the problem formulation does not include them) is a predicate that checks if the line corresponding to the new edge intersects with obstacles.
+In the above, $\Delta q$ is a parameter of the algorithm that fixes the traveled distance between waypoints, and $CollFree(q_v, q_n) = \forall \lambda \in [0, 1], \lambda q_v + (1 - \lambda) q_n \notin B$ is a predicate that checks if the line corresponding to the new edge intersects with obstacles.
+
+We will consider the case where no path exists between $x_{init}$ and $G$ in Section~\ref{sub:interlevel_interaction}.
 
 \subsection{Low Level Planner}
 \label{sub:low_level_planner}
 
-We use the SMT solver dReal to check the feasibility of the path plan. We choose not to require that the waypoints are precisely followed. Instead, we require the system to move through a ball around them. In detail, let $q$ be the last waypoint of the current path plan for which a trajectory has been generated and let $q'$ be the next waypoint. The system $\Sigma$ has a valid trajectory from $q$ to a ball around $q'$ (arriving ball) in finite time avoiding obstacles if the following formula is satisfied:\ffran{This is written for a non hybrid system. I'll leave the jumps until I'm sure this is correct.}
+We use the SMT solver dReal to check the feasibility of the path plan. We choose not to require that the waypoints are precisely followed. Instead, we require the system to move through a ball around them. In detail, let $q$ be the last waypoint of the current path plan for which a trajectory has been generated and let $q'$ be the next waypoint. The system $\Sigma$ has a valid trajectory from $q$ to a ball around $q'$ (arriving ball) in finite time avoiding obstacles if the following formula is satisfied:\ffran{Maybe specifying this here is unnecessary if we use dReach. Regardless, check if it is correct.}
 
 \begin{equation}
     \label{eq:reach_check}
@@ -94,15 +98,15 @@ We use the SMT solver dReal to check the feasibility of the path plan. We choose
             \epsilon < \epsilon_{max} \land \\
         &\forall t \Big((t < T) \rightarrow 
             (q'_t = \int_{0}^{t} f(x, u) dx + q \land 
-            q'_t \notin B )\Big)
+            q'_t \in W )\Big)
         \bigg)
         %\bigg]
     \end{split}
 \end{equation}
 
-In the above, $B_r(p)$ is the closed ball of radius $r$ and center $p$, $T_{max}$ is the maximum time allowed for the trajectory between waypoints and $\epsilon_{max}$ is the maximum radius allowed for the arriving ball. If \ref{eq:reach_check} is satisfiable, the SMT solver will obtain witnesses for the existentially qualified variables $q'_n, T, u$ and $\epsilon$. The point $q'_n$ will substitute the intended next waypoint $q'$ in the path plan, while $u$ and $T$ will become part of a piecewise constant control function.
+In the above, $B_r(p)$ is the closed ball of radius $r$ and center $p$, $T_{max}$ is the maximum time allowed for the trajectory between waypoints and $\epsilon_{max}$ is the maximum radius allowed for the arriving ball. If \eqref{eq:reach_check} is satisfiable, the SMT solver will obtain witnesses for the existentially qualified variables $q'_n, T, u$ and $\epsilon$. The point $q'_n$ will substitute the intended next waypoint $q'$ in the path plan, while $u$ and $T$ will become part of a piecewise constant control function.
 
-In the next subsection we consider the case where \ref{eq:reach_check} is not satisfiable.
+In the next subsection we consider the case where \eqref{eq:reach_check} is not satisfiable.
 
 \fran{Would it be interesting to find the largest infeasible ball?}
 
@@ -115,15 +119,16 @@ Assume a trajectory is not feasible between the waypoints $q$ and $q'$. From the
     \label{eq:virtual_obst}
     \begin{split}
         B^*_i : \quad \{x \in \mathbb{R} \mid &v'x - v'q - \lambda \|v\|^2 > 0, \\
-                                              &v'x - v'q - (\lambda - \delta / \|v\|) \|v\|^2 < 0, \\
                                               &v_i'x - v_i'q - h < 0, \\
                                               &v_i'x - v_i'q + h > 0, \text{for } v_i \in \mathcal{B} \}
     \end{split}
 \end{equation}
 
-The polytope $B^*_i$ as defined above is a prismatic polytope with a hypercubic base, oriented as given by $\mathcal{B}$ and side length equal to $2 h$, translated a distance $\delta$ into the remaining dimension. The center of the base is located in the point $q + \lambda v$ and the translation is towards $q'$. A graphical representation in two dimensions can be seen in Figure~\ref{fig:}. Note that the side length of the base has been chosen so that every line from $q'$ to $B_{\epsilon_{max}}(q')$ intersects with $B^*_i$. Also note that for $\lambda = 1 - \epsilon / \|v\|$, the base of the prism is tangent to the ball.
+The polytope $B^*_i$ as defined above is a squared hiperplane, oriented as given by $\mathcal{B}$, side length equal to $2 h$ and center located in the point $q + \lambda v$. A graphical representation in two dimensions can be seen in Figure~\ref{fig:}. Note that the side length of the base has been chosen so that every line from $q'$ to $B_{\epsilon_{max}}(q')$ intersects with $B^*_i$. Also note that for $\lambda = 1 - \epsilon / \|v\|$, the hyperplane is tangent to the ball.
 
 \fran{It may be overkill to block the whole ball. In principle, if placed tangent it shouldn't block any point that is not on the ball from $q$, since any point between the obstacle and the ball would be covered by a ball centered in a point in the boundary of the obstacle, which RRT could choose. However, it seems to block paths between points near $q$ and points near $q'$. I don't think it's possible to avoid this kind of conservatism, but it should be explored at some point how to mitigate it.}
+
+\fran{The previous paragraph should be redacted and added to the text, since it is referenced afterwards}
 
 \fran{I'd like to formalize a bit better the new problem for the high level planner, so that it is clear that we add the virtual obstacle to the set of obstacles just for RRT but not for dReal}
 
@@ -142,6 +147,36 @@ In the above, we consider possible edges to add to the graph so that it becomes 
 \end{equation}
 
 Note that checking $V_N$ before $V_N'$ is just a heuristic: it is possible that the length of the path obtained when using an edge from $V_N$ is so much longer that the amount of computation done by the lower level planner increases, compared to a path resulting from introducing an edge from $V_N'$. If $V_N'$ is also empty, we cannot reconnect the two subtrees with the given distance constraint, so a new tree needs to be generated. We restart RRT using $Q$ as an initial graph so at least that amount of computation is carried over.
+
+Consider now the case where it is not possible to obtain a path plan\ffran{How do we decide when to stop and check? If checking is inexpensive (unlikely), we can do it periodically. Otherwise, we can check whether we are getting closer to G and trigger the computation of $A_{cur}$ if we are not}. In this case, we can define the following regions of the state space: a maximally connected region $A_{cur} \subset W$ such that $x_{init} \in A_{cur}$ and $G \notin A_{cur}$, and $A_{next} = W \setminus A_{cur}$. We can then formulate the following variation of \eqref{eq:reach_check}:
+
+\begin{equation}
+    \label{eq:reach_sets_check}
+    \begin{split}
+        &\exists q'_n \exists q \exists T \exists u \\
+        %\forall q_0 \bigg[
+        %    &q_0 \in B_{\epsilon_i}(q) \rightarrow \\
+        &\bigg(
+            q'_n = \int_{0}^{T} f(x, u) dx + q \land \\
+        &q'_n \in A_{next} \land 
+            q \in A_{cur} \land
+            u \in \mathcal{U} \land
+            T < T_{max} \land \\
+        &\forall t \Big((t < T) \rightarrow 
+            (q'_t = \int_{0}^{t} f(x, u) dx + q \land 
+            q'_t \in W )\Big)
+        \bigg)
+        %\bigg]
+    \end{split}
+\end{equation}
+
+Intuitively, \eqref{eq:reach_sets_check} specifies whether there exists a trajectory of $\Sigma$ that starts in $A_{cur}$ and ends in $A_{next}$ when applied a constant control for no more than $T_{max}$ time units\footnote{Note that if there is no trajectory shorter than $T_{max}$, there will not be a longer trajectory (for a short subtrajectory would satisfy the proposition)}. If it is not satisfiable, then $\phi$ is not satisfiable by the continuity of the trajectories of $\Sigma$. On the other hand, if it is satisfiable (which is possible, as discussed previously), we obtain the points $q_c$ and $q_n$ as witnesses for the variables $q$ and $q'_n$. 
+
+We can obtain a solution to Problem~\ref{pr:reach} by combining the solution of two instances of the same problem: one where the goal region is substituted by the set $\{q_c\}$, which we call subproblem $P_C$, and one where the initial state is substituted by $q_n$, which we call subproblem $P_N$. If the solution to both $P_C$ and $P_N$ is that the corresponding proposition is satisfiable, then $\phi$ is satisfiable and a control function can be obtained by joining the control functions from $P_C$, $P_N$ and the witness from \eqref{eq:reach_sets_check}. However, we cannot claim that $\phi$ is not satisfiable otherwise. Note that the witnesses $q_c$ and $q_n$ are just a possible choice, and so different ones might yield positive solutions to the subproblems $P_C$ and $P_N$.
+
+\fran{Discuss further how to pick different witnesses}
+
+\fran{It should be possible to reuse previous computation in order to solve $P_C$}
 
 \fran{It would be interesting to explore heuristics that try to avoid trying to connect points near $q$ to points near $q'$, although I'm not sure if it even makes sense}
 
