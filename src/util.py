@@ -1,4 +1,5 @@
 import numpy as np
+import cddwrap as cdd
 
 class Tree(object):
     def __init__(self, node=None):
@@ -25,3 +26,18 @@ class Box(object):
                 np.all(x <= self.constraints[:,1])
         else:
             return False
+
+
+class Polytope(cdd.CDDMatrix):
+
+    def __contains__(self, x):
+        if isinstance(x, Polytope):
+            return not cdd.pempty(cdd.pinters(self, x))
+        elif isinstance(x, np.ndarray):
+            return not cdd.pempty(
+                cdd.pinters(self, Polytope([np.insert(x, 0, 1)], False)))
+        else:
+            raise Exception("Not implemented")
+
+def line(a, b):
+    return Polytope([np.insert(x, 0, 1) for x in [a, b]], False)

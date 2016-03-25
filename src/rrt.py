@@ -1,4 +1,4 @@
-from util import Tree
+from util import Tree, line
 import numpy as np
 
 class RRT(object):
@@ -15,11 +15,21 @@ class RRT(object):
             x_random = self.pick_random()
             x_near_tree = nearest(t, x_random)
             x_near = x_near_tree.node
-            x_new = x_near + self.dx * (x_random - x_near) / \
-                np.linalg.norm(x_random - x_near)
-            if self.isvalid(x_new):
+            v = x_random - x_near
+            vnorm = np.linalg.norm(v)
+            if vnorm > self.dx:
+                x_new = x_near + self.dx * v / vnorm
+            else:
+                x_new = x_random
+            if self.isvalid(x_new, x_near):
                 cur = Tree(x_new)
                 x_near_tree.add_child(cur)
+                print t.nodes()
+            # else:
+            #     print 'not valid'
+            #     print x_new
+            #     print x_near
+            #     print t.nodes()
 
         return t, cur
 
@@ -27,11 +37,11 @@ class RRT(object):
         return np.array([np.random.uniform(c[0], c[1])
                          for c in self.constraints.constraints])
 
-    def isvalid(self, x_new):
+    def isvalid(self, x_new, x_near):
+        l = line(x_new, x_near)
         return x_new in self.constraints and \
-            all(x_new not in obs for obs in self.obstacles)
+            all(l not in obs for obs in self.obstacles)
 
-        return True
 
 
 def nearest(t, x):
