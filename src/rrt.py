@@ -11,7 +11,7 @@ class RRT(object):
         t = Tree(x_init)
         cur = t
 
-        while not cur.node in goal:
+        while not goal.contains(cur.node):
             x_random = self.pick_random()
             x_near_tree = nearest(t, x_random)
             x_near = x_near_tree.node
@@ -39,8 +39,8 @@ class RRT(object):
 
     def isvalid(self, x_new, x_near):
         l = line(x_new, x_near)
-        return x_new in self.constraints and \
-            all(l not in obs for obs in self.obstacles)
+        return self.constraints.contains(x_new) and \
+            all(not obs.contains(l) for obs in self.obstacles)
 
 
 

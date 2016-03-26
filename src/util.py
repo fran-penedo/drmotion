@@ -1,5 +1,7 @@
 import numpy as np
 import cddwrap as cdd
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 class Tree(object):
     def __init__(self, node=None):
@@ -20,17 +22,20 @@ class Box(object):
     def __init__(self, constraints):
         self.constraints = constraints
 
-    def __contains__(self, x):
+    def contains(self, x):
         if x.shape == (self.constraints.shape[0],):
             return np.all(x >= self.constraints[:,0]) and \
                 np.all(x <= self.constraints[:,1])
+        elif len(x.shape) > 1 and x.shape[1] == self.constraints.shape[0]:
+            return np.logical_and(np.all(x >= self.constraints[:,0], axis=1),
+                                  np.all(x <= self.constraints[:,1], axis=1))
         else:
             return False
 
 
 class Polytope(cdd.CDDMatrix):
 
-    def __contains__(self, x):
+    def contains(self, x):
         if isinstance(x, Polytope):
             return not cdd.pempty(cdd.pinters(self, x))
         elif isinstance(x, np.ndarray):
@@ -41,3 +46,64 @@ class Polytope(cdd.CDDMatrix):
 
 def line(a, b):
     return Polytope([np.insert(x, 0, 1) for x in [a, b]], False)
+
+
+def cover(contain, exclude, epsilon):
+    if len(contain) == 0:
+        return []
+    elif len(contain) == 1:
+        return [Box(np.vstack([contain, contain]).T)]
+
+    mins = np.min(contain, axis=0)
+    maxs = np.max(contain, axis=0)
+    cons = np.vstack([mins, maxs]).T
+    box = Box(cons.copy())
+
+    exclude = exclude[box.contains(exclude)]
+    if len(exclude) == 0:
+        return [box]
+
+    rmins = np.min(exclude, axis=0)
+    rmaxs = np.max(exclude, axis=0)
+    rcons = np.vstack([rmins, rmaxs]).T
+
+    if np.all(cons - rcons < epsilon):
+        dsplit = np.argmax(cons[:,1] - cons[:,0])
+        theta = (cons[dsplit, 1] + cons[dsplit, 0]) / 2
+        return cover(contain[contain[:,dsplit] < theta],
+                     exclude[exclude[:,dsplit] < theta], epsilon) + \
+                cover(contain[contain[:,dsplit] >= theta],
+                     exclude[exclude[:,dsplit] >= theta], epsilon)
+
+    n = contain.shape[1]
+    boxes = []
+
+    for i in range(n):
+        dmin = min([x for x in contain[:, i] if x > rmaxs[i]])
+        cons[i] = np.array([dmin, maxs[i]])
+        boxes.append(Box(cons.copy()))
+        dmax = max([x for x in contain[:, i] if x < rmins[i]])
+        cons[i] = np.array([mins[i], dmax])
+        boxes.append(Box(cons.copy()))
+        cons[i] = np.array([dmax, dmin])
+
+    rbox = Box(rcons)
+    ncontain = contain[rbox.contains(contain)]
+    nexclude = exclude[rbox.contains(exclude)]
+    nboxes = cover(ncontain, nexclude, epsilon)
+
+    return boxes + nboxes
+
+
+def plot_boxes(boxes, include, exclude):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(include[:,0], include[:,1], 'bo')
+    ax.plot(exclude[:,0], exclude[:,1], 'ro')
+    for box in boxes:
+        cs = box.constraints
+        x, y = cs[:,0]
+        w, h = cs[:,1] - cs[:,0]
+        ax.add_patch(patches.Rectangle((x,y), w, h, facecolor="green", alpha=.5))
+
+    plt.show()
