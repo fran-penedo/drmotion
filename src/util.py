@@ -44,6 +44,7 @@ class Polytope(cdd.CDDMatrix):
         else:
             raise Exception("Not implemented")
 
+
 def line(a, b):
     return Polytope([np.insert(x, 0, 1) for x in [a, b]], False)
 
@@ -93,6 +94,21 @@ def cover(contain, exclude, epsilon):
     nboxes = cover(ncontain, nexclude, epsilon)
 
     return boxes + nboxes
+
+
+def extend(face, d, epsilon):
+    cons = face.constraints.copy()
+    ds = d.copy()
+    ds.shape = (ds.shape[0], 1)
+    dim = cons.shape[0]
+    s = epsilon / np.sqrt(dim)
+    # move face outwards
+    cons = cons + ds * s
+    # extend to corners
+    v = (np.ones(cons.shape) - np.abs(ds)) * np.array([-s, s])
+    cons = cons + v
+
+    return Box(cons)
 
 
 def plot_boxes(boxes, include, exclude):
