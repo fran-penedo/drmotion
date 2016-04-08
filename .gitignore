@@ -1,0 +1,5 @@
+*.paths
+*.model
+*.smt2
+*.json
+*.output
