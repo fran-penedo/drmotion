@@ -21,6 +21,7 @@ class Tree(object):
 class Box(object):
     def __init__(self, constraints):
         self.constraints = constraints
+        self.n = constraints.shape[0]
 
     def contains(self, x):
         if x.shape == (self.constraints.shape[0],):
@@ -47,6 +48,37 @@ class Polytope(cdd.CDDMatrix):
 
 def line(a, b):
     return Polytope([np.insert(x, 0, 1) for x in [a, b]], False)
+
+
+class Ellipsoid2D(object):
+    def __init__(self, a, b, v):
+        self.a2 = a*a
+        self.b2 = b*b
+        self.v = v
+        self.A = np.diag([1/self.a2, 1/self.b2])
+
+    def contains(self, x):
+        if isinstance(x, Polytope):
+            vrep = cdd.vrep_pts(x)
+            if vrep.shape == (2, 2):
+                z = vrep[0] - vrep[1]
+                w = vrep[1] - self.v
+                print vrep
+                print z
+                print w
+                print self.A
+                return (z.dot(self.A).dot(w))**2 >= \
+                    (z.dot(self.A).dot(z))*(w.dot(self.A).dot(w) - 1)
+            else:
+                raise Exception("Not implemented")
+        elif x.shape == (2,):
+            return (x[0] - self.v[0])**2 / self.a2 + \
+                (x[1] - self.v[1])**2 / self.b2 <= 1
+        elif len(x.shape) > 1 and x.shape[1] == 2:
+            return (x[:,0] - self.v[0])**2 / self.a2 + \
+                (x[:,1] - self.v[1])**2 / self.b2 <= 1
+        else:
+            return False
 
 
 def cover(contain, exclude, epsilon):

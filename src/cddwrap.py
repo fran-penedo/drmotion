@@ -1,4 +1,5 @@
 import cdd
+import numpy as np
 
 class CDDMatrix(object):
 
@@ -82,6 +83,12 @@ class CDDMatrix(object):
     def __str__(self):
         return self._m.__str__()
 
+
+def vrep(m):
+    return CDDMatrix(cdd.Polyhedron(m._m).get_generators())
+
+def vrep_pts(m):
+    return np.array([v[1:] for v in vrep(m)])
 
 def pempty(m):
     m.obj_type = cdd.LPObjType.MAX

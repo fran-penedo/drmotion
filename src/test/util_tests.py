@@ -39,6 +39,26 @@ def line_test():
     nt.assert_true(p.contains(p1))
     nt.assert_false(p.contains(p2))
 
+def ellipsoid2d_test():
+    e = Ellipsoid2D(2.0, 3.0, [1.0, 2.0])
+    x = np.array([1.0, 2.0])
+    y = np.array([10.0, 10.0])
+
+    nt.assert_true(e.contains(x))
+    nt.assert_false(e.contains(y))
+    np.testing.assert_array_equal(e.contains(np.vstack([x, y])),
+                                  np.array([True, False]))
+
+    # Can't check this tangent due to floating point precision errors
+    # l1 = line(np.array([0, 5]), np.array([10,5]))
+    l2 = line(np.array([0, 4]), np.array([10,5]))
+    l3 = line(np.array([0, 6]), np.array([10,6]))
+
+    # nt.assert_true(e.contains(l1))
+    nt.assert_true(e.contains(l2))
+    nt.assert_false(e.contains(l3))
+
+
 def cover_test():
     n = 8
     contain = np.random.random((100, n))
