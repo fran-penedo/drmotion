@@ -2,6 +2,7 @@ import numpy as np
 import cddwrap as cdd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import itertools as it
 
 class Tree(object):
     def __init__(self, node=None):
@@ -33,8 +34,22 @@ class Box(object):
         else:
             return False
 
+    def aspoly(self):
+        m = np.empty((self.n * 2, self.n + 1))
+        m[0::2, 1:] = np.identity(self.n)
+        m[1::2, 1:] = -np.identity(self.n)
+        m[0::2, 0] = -self.constraints[:, 0]
+        m[1::2, 0] = self.constraints[:, 1]
+        return Polytope(m)
+
 
 class Polytope(cdd.CDDMatrix):
+
+    @staticmethod
+    def fromcdd(m):
+        x = Polytope([])
+        x._m = m._m
+        return x
 
     def contains(self, x):
         if isinstance(x, Polytope):
@@ -45,10 +60,51 @@ class Polytope(cdd.CDDMatrix):
         else:
             raise Exception("Not implemented")
 
+    @property
+    def n(self):
+        return self.col_size - 1
+
+
+def inters(*args):
+    x = cdd.pinters(*args)
+    return Polytope.fromcdd(x)
+
+def inters_to_union(p, ps):
+    x = cdd.pinters_to_union(p, ps)
+    return [Polytope.fromcdd(a) for a in x]
 
 def line(a, b):
     return Polytope([np.insert(x, 0, 1) for x in [a, b]], False)
 
+def conv_pts(m):
+    return Polytope(np.insert(m, 0, 1, axis=1), False)
+
+def conv(pols):
+    return conv_pts(np.vstack([cdd.vrep_pts(p) for p in pols]))
+
+def exterior(p, region):
+    it = constr_it(len(p))
+    next(it)
+    exts = inters_to_union(region,
+                                [Polytope(np.asarray(
+                                    np.multiply(p, np.matrix(c).T)))
+                                    for c in it])
+    return [ext for ext in exts if len(ext.lin_set) == 0]
+
+def constr_it(n):
+    i = 0
+    m = 2**n
+    while i < m:
+        b = binp(i, m.bit_length() - 1)
+        yield np.array([-x if x == 1 else 1 for x in b])
+        i += 1
+
+def bin(s):
+    return [s] if s <= 1 else bin(s >> 1) + [s & 1]
+
+def binp(s, p):
+    b = bin(s)
+    return [0 for i in range(p - len(b))] + b
 
 class Ellipsoid2D(object):
     def __init__(self, a, b, v):
@@ -127,6 +183,15 @@ def cover(contain, exclude, epsilon):
 
     return boxes + nboxes
 
+def faces(region):
+    for box in region:
+        for i in range(region.n):
+            cons_up = box.constraints.copy()
+            cons_up[i,0] = cons[i,1]
+            yield Box(cons_up)
+            cons_down = box.constraints.copy()
+            cons_down[i,1] = cons[i,0]
+            yield Box(cons_down)
 
 def extend(face, d, epsilon):
     cons = face.constraints.copy()
@@ -142,6 +207,44 @@ def extend(face, d, epsilon):
 
     return Box(cons)
 
+
+def cdecomp(region, obsts):
+    robsts = inters_to_union(region, obsts)
+
+    vs = np.vstack([cdd.vrep_pts(obs) for obs in robsts + [region]])
+    vs = vs[vs[:,0].argsort()]
+    vs = vs[~np.isclose(np.r_[1, np.diff(vs, axis=0)[:,0]], 0)]
+
+    lines = [inters(region, Polytope(np.array([[-v[0], 1, 0],
+                                                    [v[0], -1, 0]])))
+             for v in vs]
+    free = []
+
+    for i in range(len(lines) - 1):
+        cil = conv(lines[i:i+2])
+        cobsts = inters_to_union(cil, obsts)
+        exts = [exterior(obs, cil) for obs in cobsts if len(obs.lin_set) == 0]
+        if len(exts) == 0:
+            free.append(cil)
+        elif len(exts) == 1:
+            free.extend(exts[0])
+        else:
+            frees = [inters(*tup) for tup in it.product(*exts)]
+            free.extend(x for x in frees if not cdd.pempty(x))
+
+    return free
+
+def adj_matrix(pols):
+    n = len(pols)
+    m = dict()
+    for i in range(n):
+        for j in range(i, n):
+            if i != j:
+                ints = inters(pols[i], pols[j])
+                if not cdd.pempty(ints):
+                    m[i,j] = ints
+                    m[j,i] = ints
+    return m
 
 def plot_boxes(boxes, include, exclude):
     fig = plt.figure()

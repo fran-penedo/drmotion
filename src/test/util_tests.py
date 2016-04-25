@@ -1,6 +1,7 @@
 from util import *
 import numpy as np
 import nose.tools as nt
+import cddwrap as cdd
 
 def nodes_test():
     t = Tree(1)
@@ -83,3 +84,26 @@ def extend_test():
                                   np.array([[-1 - e/np.sqrt(3), 1 + e/np.sqrt(3)],
                                             [2 - e/np.sqrt(3), 3 + e/np.sqrt(3)],
                                             [1 - e/np.sqrt(3), 1 - e/np.sqrt(3)]]))
+
+def conv_test():
+    a = line(np.r_[0, 0], np.r_[0, 1])
+    b = line(np.r_[1, 0], np.r_[1, 1])
+    c = conv([a,b])
+    nt.assert_equal(len(cdd.vrep_pts(c)), 4)
+
+def exterior_test():
+    region = conv_pts(np.array([[0, 0], [0, 1], [1, 1], [1, 0]]))
+    obst = conv_pts(np.array([[.2, .2], [.4, .4], [.4, .2], [.2, .4]]))
+    ext = exterior(obst, region)
+    print len(ext)
+
+def cdecomp_test():
+    region = conv_pts(np.array([[0, 0], [0, 1], [1, 1], [1, 0]]))
+    obst = conv_pts(np.array([[.2, .2], [.4, .4], [.4, .2], [.2, .4]]))
+    free = cdecomp(region, [obst])
+    nt.assert_equal(len(free), 4)
+
+    obst1 = conv_pts(np.array([[.3, .3], [.5, .5], [.5, .3], [.3, .5]]))
+    free = cdecomp(region, [obst, obst1])
+    nt.assert_equal(len(free), 8)
+

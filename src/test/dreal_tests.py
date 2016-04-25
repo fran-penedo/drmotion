@@ -28,6 +28,7 @@ def drh_check_sat_test():
         res, _ = drh_check_sat(drh)
         nt.assert_false(res)
 
+@nt.nottest
 def drh_connect_test():
     region = Box(np.array([[0, 10], [0, 10]]))
     init = Box(np.array([[5, 5], [2, 8]]))
@@ -48,5 +49,19 @@ def drh_connect_test():
     # print drh
     # print out
 
-    nt.assert_false(res)
+    # nt.assert_false(res)
 
+def drh_connect_dec_test():
+    region = Box(np.array([[0, 10], [0, 10]]))
+    init = Box(np.array([[5, 5], [2, 8]])).aspoly()
+    goal = Box(np.array([[6, 6], [2, 8]])).aspoly()
+    t_max = 4
+    obst1 = Box(np.array([[5, 6], [4, 6]])).aspoly()
+
+    drh = drh_connect(init, goal, region, [obst1], t_max, True)
+    res, out = drh_check_sat(drh, k=10)
+
+    print drh
+    print out
+    nt.assert_true(res)
+    assert False

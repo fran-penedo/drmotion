@@ -67,6 +67,7 @@ class CDDMatrix(object):
 
         self._extend(lin, True)
         self._extend(notlin, False)
+        self.canonicalize()
 
     def _extend(self, rows, linear):
         if len(rows) > 0:
@@ -84,23 +85,34 @@ class CDDMatrix(object):
         return self._m.__str__()
 
 
-def vrep(m):
-    return CDDMatrix(cdd.Polyhedron(m._m).get_generators())
+def _vrep(m):
+    return cdd.Polyhedron(m._m).get_generators()
 
 def vrep_pts(m):
-    return np.array([v[1:] for v in vrep(m)])
+    return np.array([v[1:] for v in _vrep(m)])
 
 def pempty(m):
     m.obj_type = cdd.LPObjType.MAX
     m.obj_func = [0 for i in range(m.col_size)]
     lp = cdd.LinProg(m._m)
     lp.solve()
+    m.obj_type = cdd.LPObjType.NONE
     return lp.status == cdd.LPStatusType.INCONSISTENT
 
-def pinters(a, b):
-    return extend(a, b)
+def pinters(*args):
+    if len(args) == 0:
+        raise Exception("Need at least one argument")
+    elif len(args) == 1:
+        return args[0]
+    elif len(args) == 2:
+        return extend(args[0], args[1])
+    else:
+        return pinters(extend(args[0], args[1]), *args[2:])
 
 def extend(a, b):
     x = a.copy()
     x.extend(b)
     return x
+
+def pinters_to_union(p, ps):
+    return [b for b in (pinters(p, a) for a in ps) if not pempty(b)]

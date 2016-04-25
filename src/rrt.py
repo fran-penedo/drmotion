@@ -33,6 +33,9 @@ class RRT(object):
 
         return t, cur
 
+    def gen_tree(self, x_init, goal):
+        pass
+
     def pick_random(self):
         return np.array([np.random.uniform(c[0], c[1])
                          for c in self.constraints.constraints])
