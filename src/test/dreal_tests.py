@@ -58,10 +58,9 @@ def drh_connect_dec_test():
     t_max = 4
     obst1 = Box(np.array([[5, 6], [4, 6]])).aspoly()
 
-    drh = drh_connect(init, goal, region, [obst1], t_max, True)
+    drh = drh_connect(init, goal, region, [obst1], t_max, "x", True)
     res, out = drh_check_sat(drh, k=10)
 
     print drh
     print out
     nt.assert_true(res)
-    assert False

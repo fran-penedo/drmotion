@@ -3,6 +3,7 @@ import cddwrap as cdd
 from multimethods import multimethod
 from cStringIO import StringIO
 from subprocess import Popen, PIPE
+import re
 import os
 from os import path
 import tempfile
@@ -53,9 +54,8 @@ def c_id_reset(v, n):
         ["({0}_{1}' = {0}_{1})".format(v, i) for i in range(n)] +
         ["(z' = z)"]))
 
-def drh_connect(init, goal, region, obsts, t_max, decomp=False):
+def drh_connect(init, goal, region, obsts, t_max, x_label="x", decomp=False):
     out = StringIO()
-    x_label = "x"
 
     for i in range(region.n):
         print >>out, "[{0[0]}, {0[1]}] {1}_{2};".format(
@@ -135,8 +135,27 @@ def drh_check_sat(drh, k=0):
         print err
         raise Exception()
 
-def drh_connect_pair(init, goal, region, obsts, t_max):
-    pass
+def drh_connect_pair(init, goal, region, obsts, t_max, decomp=False):
+    label = "x"
+    drh = drh_connect(init, goal, region, obsts, t_max, label, decomp)
+    sat, model = drh_check_sat(drh, 10 if decomp else 0)
+    if sat:
+        xlines = [l for l in model.splitlines() if l.startswith(label + "_")]
+        xlinesgrp = [[l for l in xlines if l.startswith(label + "_" + str(i))]
+                     for i in range(region.n)]
+        return np.vstack([[parse_model_value(xlinesgrp[i][j])
+                           for i in range(region.n)]
+                          for j in [0, -1]])
+    else:
+        raise Exception()
+
+def parse_model_value(line):
+    fp = r'[-+]?\d*\.\d+|\d+'
+    m = re.match(r'.*= \[(' + fp + r'), (' + fp + r')\]', line)
+    return (float(m.group(1)) + float(m.group(2))) / 2.0
+
+
+
 
 
 
