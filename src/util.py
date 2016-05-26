@@ -3,6 +3,7 @@ import cddwrap as cdd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import itertools as it
+from multimethods import multimethod
 
 class Tree(object):
     def __init__(self, node=None):
@@ -14,9 +15,33 @@ class Tree(object):
         self.children.append(x)
         x.parent = self
 
+    def add_children(self, xs):
+        for x in xs:
+            self.add_child(x)
+
+    def rem_child(self, x):
+        self.children.remove(x)
+
     def nodes(self):
         return [self.node] + [n for nodes in [c.nodes() for c in self.children]
                               for n in nodes]
+
+    def make_root(self):
+        if self.parent is not None:
+            self.parent.make_root()
+            self.parent.rem_child(self)
+            self.add_child(self.parent)
+            self.parent = None
+
+    def find(self, x):
+        if all(self.node == x):
+            return self
+        for c in self.children:
+            f = c.find(x)
+            if f is not None:
+                return f
+        return None
+
 
 
 class Box(object):
@@ -41,6 +66,9 @@ class Box(object):
         m[0::2, 0] = -self.constraints[:, 0]
         m[1::2, 0] = self.constraints[:, 1]
         return Polytope(m)
+
+    def corners(self):
+        return np.array(list(it.product(*self.constraints)))
 
 
 class Polytope(cdd.CDDMatrix):
@@ -148,6 +176,9 @@ def cover(contain, exclude, epsilon):
     cons = np.vstack([mins, maxs]).T
     box = Box(cons.copy())
 
+    if isinstance(exclude, Box):
+        exclude = exclude.corners()
+
     exclude = exclude[box.contains(exclude)]
     if len(exclude) == 0:
         return [box]
@@ -185,13 +216,13 @@ def cover(contain, exclude, epsilon):
 
 def faces(region):
     for box in region:
-        for i in range(region.n):
+        for i in range(box.n):
             cons_up = box.constraints.copy()
-            cons_up[i,0] = cons[i,1]
-            yield Box(cons_up)
+            cons_up[i,0] = cons_up[i,1]
+            yield Box(cons_up), np.r_[np.zeros(i), 1, np.zeros(box.n - i - 1)]
             cons_down = box.constraints.copy()
-            cons_down[i,1] = cons[i,0]
-            yield Box(cons_down)
+            cons_down[i,1] = cons_down[i,0]
+            yield Box(cons_down), np.r_[np.zeros(i), -1, np.zeros(box.n - i - 1)]
 
 def extend(face, d, epsilon):
     cons = face.constraints.copy()
@@ -206,6 +237,24 @@ def extend(face, d, epsilon):
     cons = cons + v
 
     return Box(cons)
+
+@multimethod(Box, np.ndarray)
+def contains(s, x):
+    if x.shape == (s.constraints.shape[0],):
+        return np.all(x >= s.constraints[:,0]) and \
+            np.all(x <= s.constraints[:,1])
+    elif len(x.shape) > 1 and x.shape[1] == s.constraints.shape[0]:
+        return np.logical_and(np.all(x >= s.constraints[:,0], axis=1),
+                                np.all(x <= s.constraints[:,1], axis=1))
+    else:
+        return False
+
+@multimethod(np.ndarray, np.ndarray)
+def contains(s, e):
+    if len(e.shape) == 1:
+        return np.any(np.all(s == e, axis=1))
+    else:
+        raise Exception("Not implemented")
 
 
 def cdecomp(region, obsts):

@@ -76,7 +76,7 @@ def cover_test():
 def extend_test():
     cons = np.array([[-1, 1], [2, 3], [1, 1]])
     b = Box(cons)
-    d = np.array([0, 0, -1]).T
+    d = np.array([0, 0, -1])
     e = 2
     be = extend(b, d, e)
 

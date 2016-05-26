@@ -1,4 +1,5 @@
 from util import Box, Polytope, Ellipsoid2D, cdecomp, conv, adj_matrix
+import numpy as np
 import cddwrap as cdd
 from multimethods import multimethod
 from cStringIO import StringIO
@@ -104,7 +105,6 @@ def drh_mode(l, x_label, invt, jumps):
     if len(jumps) > 0:
         for k in jumps:
             if k[0] == l:
-                print jumps[k]
                 print >>out, "{0} ==> @{1} {2};".format(
                     c_shape(jumps[k], x_label), k[1] + 1,
                     c_id_reset(x_label, invt.n))
@@ -147,7 +147,7 @@ def drh_connect_pair(init, goal, region, obsts, t_max, decomp=False):
                            for i in range(region.n)]
                           for j in [0, -1]])
     else:
-        raise Exception()
+        raise DRHNoModel()
 
 def parse_model_value(line):
     fp = r'[-+]?\d*\.\d+|\d+'
@@ -155,7 +155,8 @@ def parse_model_value(line):
     return (float(m.group(1)) + float(m.group(2))) / 2.0
 
 
-
-
+class DRHNoModel(Exception):
+    def __init__(self):
+        Exception.__init__(self)
 
 
