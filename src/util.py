@@ -1,4 +1,5 @@
 import numpy as np
+import math
 import cddwrap as cdd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -42,6 +43,10 @@ class Tree(object):
                 return f
         return None
 
+    def copy(self):
+        t = Tree(self.node)
+        t.add_children(c.copy() for c in self.children)
+        return t
 
 
 class Box(object):
@@ -199,10 +204,10 @@ def cover(contain, exclude, epsilon):
     boxes = []
 
     for i in range(n):
-        dmin = min([x for x in contain[:, i] if x > rmaxs[i]])
+        dmin = min([x for x in contain[:, i] if x >= rmaxs[i]])
         cons[i] = np.array([dmin, maxs[i]])
         boxes.append(Box(cons.copy()))
-        dmax = max([x for x in contain[:, i] if x < rmins[i]])
+        dmax = max([x for x in contain[:, i] if x <= rmins[i]])
         cons[i] = np.array([mins[i], dmax])
         boxes.append(Box(cons.copy()))
         cons[i] = np.array([dmax, dmin])
@@ -219,10 +224,10 @@ def faces(region):
         for i in range(box.n):
             cons_up = box.constraints.copy()
             cons_up[i,0] = cons_up[i,1]
-            yield Box(cons_up), np.r_[np.zeros(i), 1, np.zeros(box.n - i - 1)]
+            yield Box(cons_up), np.r_[np.zeros(i), 1, np.zeros(box.n - i - 1)], box
             cons_down = box.constraints.copy()
             cons_down[i,1] = cons_down[i,0]
-            yield Box(cons_down), np.r_[np.zeros(i), -1, np.zeros(box.n - i - 1)]
+            yield Box(cons_down), np.r_[np.zeros(i), -1, np.zeros(box.n - i - 1)], box
 
 def extend(face, d, epsilon):
     cons = face.constraints.copy()
@@ -298,12 +303,82 @@ def adj_matrix(pols):
 def plot_boxes(boxes, include, exclude):
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.plot(include[:,0], include[:,1], 'bo')
-    ax.plot(exclude[:,0], exclude[:,1], 'ro')
+
+    plot_cover(ax, boxes, include, exclude)
+
+    plt.show()
+
+def plot_cover(ax, boxes, include, exclude):
+    if len(include) > 0:
+        ax.plot(include[:,0], include[:,1], 'bo')
+    if len(exclude) > 0:
+        ax.plot(exclude[:,0], exclude[:,1], 'ro')
     for box in boxes:
         cs = box.constraints
         x, y = cs[:,0]
         w, h = cs[:,1] - cs[:,0]
         ax.add_patch(patches.Rectangle((x,y), w, h, facecolor="green", alpha=.5))
 
+def plot_tree(ax, t):
+    nodes = np.array(t.nodes())
+    ax.plot(nodes[:,0], nodes[:,1], 'bo')
+    plot_tree_lines(ax, t)
+
+def plot_tree_lines(ax, t):
+    for c in t.children:
+        ax.plot([t.node[0], c.node[0]], [t.node[1], c.node[1]], 'b-')
+        plot_tree_lines(ax, c)
+
+def plot_box(ax, box, **kwargs):
+    cs = box.constraints
+    x, y = cs[:,0]
+    w, h = cs[:,1] - cs[:,0]
+    ax.add_patch(patches.Rectangle((x,y), w, h, alpha=.5, **kwargs))
+
+def plot_poly(ax, poly):
+    vs = cdd.vrep_pts(poly)
+    c = centroid(vs)
+    vs = sorted(vs, key=lambda p: math.atan2(p[1]-c[1],p[0]-c[0]))
+    ax.add_patch(patches.Polygon(vs, facecolor="red"))
+
+def centroid(vs):
+    return np.average(vs, axis=0)
+
+def plot_casestudy(cons, goal, obsts, tree):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    plot_box(ax, cons, facecolor="white")
+    plot_tree(ax, tree)
+    plot_box(ax, goal, facecolor="green")
+    for o in obsts:
+        plot_poly(ax, o)
+    plt.show()
+
+def plot_casestudy2(cons, goal, obsts, tree, boxes):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    plot_box(ax, cons, facecolor="white")
+    plot_tree(ax, tree)
+    if isinstance(goal, Box):
+        plot_box(ax, goal, facecolor="green")
+    else:
+        ax.plot(goal[:,0], goal[:,1], 'go')
+    for o in obsts:
+        plot_poly(ax, o)
+    plot_cover(ax, boxes, [], [])
+    plt.show()
+
+def plot_casestudy3(cons, goal, obsts, tree, boxes, p):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    plot_box(ax, cons, facecolor="white")
+    plot_tree(ax, tree)
+    ax.plot(p[:,0], p[:,1], 'mo')
+    if isinstance(goal, Box):
+        plot_box(ax, goal, facecolor="green")
+    else:
+        ax.plot(goal[:,0], goal[:,1], 'go')
+    for o in obsts:
+        plot_poly(ax, o)
+    plot_cover(ax, boxes, [], [])
     plt.show()

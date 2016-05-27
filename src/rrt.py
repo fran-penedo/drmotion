@@ -27,10 +27,10 @@ class RRT(object):
             else:
                 x_new = x_random
 
-            if self.isvalid(x_new, x_near):
+            if isvalid(x_new, x_near, self.constraints, self.obstacles):
                 cur = Tree(x_new)
                 x_near_tree.add_child(cur)
-                g = self.connect(x_new, goal)
+                g = connect(x_new, goal, self.constraints, self.obstacles)
                 if g is not None:
                     g_tree = Tree(g)
                     cur.add_child(g_tree)
@@ -40,30 +40,11 @@ class RRT(object):
 
         return t, cur
 
-    def connect(self, x, goal):
-        if isinstance(goal, np.ndarray):
-            for y in goal:
-                if self.isvalid(y, x):
-                    return y
-        else:
-            for y in goal.corners():
-                if self.isvalid(y, x):
-                    return y
-
     def pick_random(self):
         if isinstance(self.constraints, list):
             return random_sample(random.choice(self.constraints))
         else:
             return random_sample(self.constraints)
-
-    def isvalid(self, x_new, x_near):
-        l = line(x_new, x_near)
-        if isinstance(self.constraints, list):
-            isinside = any(contains(c, x_new) for c in self.constraints)
-        else:
-            isinside = contains(self.constraints, x_new)
-        return isinside and \
-            all(not obs.contains(l) for obs in self.obstacles)
 
 
 def random_sample(box):
@@ -84,3 +65,21 @@ def nearest(t, x):
     else:
         return t
 
+def connect(x, goal, constraints, obstacles):
+    if isinstance(goal, np.ndarray):
+        for y in goal:
+            if isvalid(y, x, constraints, obstacles):
+                return y
+    else:
+        for y in goal.corners():
+            if isvalid(y, x, constraints, obstacles):
+                return y
+
+def isvalid(x_new, x_near, constraints, obstacles):
+    l = line(x_new, x_near)
+    if isinstance(constraints, list):
+        isinside = any(contains(c, x_new) for c in constraints)
+    else:
+        isinside = contains(constraints, x_new)
+    return isinside and \
+        all(not obs.contains(l) for obs in obstacles)

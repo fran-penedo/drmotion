@@ -1,7 +1,9 @@
 from rrt import *
 from util import Box, Polytope
+import util
 import numpy as np
 import nose.tools as nt
+import matplotlib.pyplot as plt
 
 def rrt_test():
     cons = Box(np.array([[0, 10], [0, 10]]))
@@ -24,6 +26,8 @@ def rrt_obs_test():
     nt.assert_true(goal.contains(end.node))
     nt.assert_true(np.all([[not obs.contains(n) for obs in obstacles]
                            for n in t.nodes()]))
+
+    util.plot_casestudy(cons, goal, obstacles, t)
 
 rrt_obs_test.slow = 1
 

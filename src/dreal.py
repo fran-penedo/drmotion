@@ -138,7 +138,7 @@ def drh_check_sat(drh, k=0):
 def drh_connect_pair(init, goal, region, obsts, t_max, decomp=False):
     label = "x"
     drh = drh_connect(init, goal, region, obsts, t_max, label, decomp)
-    sat, model = drh_check_sat(drh, 10 if decomp else 0)
+    sat, model = drh_check_sat(drh, 5 if decomp else 0)
     if sat:
         xlines = [l for l in model.splitlines() if l.startswith(label + "_")]
         xlinesgrp = [[l for l in xlines if l.startswith(label + "_" + str(i))]
