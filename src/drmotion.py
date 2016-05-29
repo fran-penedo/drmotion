@@ -64,7 +64,7 @@ class DRMotion(object):
                 p = drh_connect_pair(f.aspoly(), extend(f, d, self.eps).aspoly(),
                                      self.constraints,
                                      obs, self.t_max, True)
-                # util.plot_casestudy3(self.constraints, goal, self.obstacles, t, region, p)
+                util.plot_casestudy3(self.constraints, goal, self.obstacles, t, region, p)
                 # print "Pair obtained"
 
                 last = rrt.connect(p[0], np.array(t.nodes()),

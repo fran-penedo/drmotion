@@ -61,13 +61,13 @@ def ellipsoid2d_test():
 
 
 def cover_test():
-    n = 8
+    n = 2
     contain = np.random.random((100, n))
     exclude = np.random.random((50, n))
     epsilon = 0.1
 
     boxes = cover(contain, exclude, epsilon)
-    # plot_boxes(boxes, contain, exclude)
+    plot_boxes(boxes, contain, exclude)
     nt.assert_false(any(np.any(
         np.vstack([box.contains(exclude) for box in boxes]), axis=0)))
     nt.assert_true(all(np.any(

@@ -171,28 +171,35 @@ class Ellipsoid2D(object):
 
 
 def cover(contain, exclude, epsilon):
+    # Base cases
     if len(contain) == 0:
         return []
     elif len(contain) == 1:
         return [Box(np.vstack([contain, contain]).T)]
 
+    # Blue box
     mins = np.min(contain, axis=0)
     maxs = np.max(contain, axis=0)
     cons = np.vstack([mins, maxs]).T
     box = Box(cons.copy())
 
+    # Special case to exclude a box
     if isinstance(exclude, Box):
         exclude = exclude.corners()
 
+    # Discard exclude points outside of blue box
     exclude = exclude[box.contains(exclude)]
     if len(exclude) == 0:
         return [box]
 
+    # Red box
     rmins = np.min(exclude, axis=0)
     rmaxs = np.max(exclude, axis=0)
     rcons = np.vstack([rmins, rmaxs]).T
 
+    # Red box too similar to blue box
     if np.all(cons - rcons < epsilon):
+        # Split on largest dimension's middle point
         dsplit = np.argmax(cons[:,1] - cons[:,0])
         theta = (cons[dsplit, 1] + cons[dsplit, 0]) / 2
         return cover(contain[contain[:,dsplit] < theta],
@@ -204,14 +211,19 @@ def cover(contain, exclude, epsilon):
     boxes = []
 
     for i in range(n):
-        dmin = min([x for x in contain[:, i] if x >= rmaxs[i]])
+        # FIXME Maybe middle point
+        dmin = (min([x for x in contain[:, i] if x >= rmaxs[i]]) + rmaxs[i]) / 2.0
         cons[i] = np.array([dmin, maxs[i]])
-        boxes.append(Box(cons.copy()))
-        dmax = max([x for x in contain[:, i] if x <= rmins[i]])
+        # FIXME Pointless if using middle point
+        if not np.any(np.isclose(cons[:, 0] - cons[:, 1], 0)):
+            boxes.append(Box(cons.copy()))
+        dmax = (max([x for x in contain[:, i] if x <= rmins[i]]) + rmins[i]) / 2.0
         cons[i] = np.array([mins[i], dmax])
-        boxes.append(Box(cons.copy()))
+        if not np.any(np.isclose(cons[:, 0] - cons[:, 1], 0)):
+            boxes.append(Box(cons.copy()))
         cons[i] = np.array([dmax, dmin])
 
+    # Recursive step: region = red box
     rbox = Box(rcons)
     ncontain = contain[rbox.contains(contain)]
     nexclude = exclude[rbox.contains(exclude)]
@@ -263,28 +275,38 @@ def contains(s, e):
 
 
 def cdecomp(region, obsts):
+    # Obstacles in region
     robsts = inters_to_union(region, obsts)
 
+    # Region and obstacle vertices, sorted, no repetitions
     vs = np.vstack([cdd.vrep_pts(obs) for obs in robsts + [region]])
     vs = vs[vs[:,0].argsort()]
     vs = vs[~np.isclose(np.r_[1, np.diff(vs, axis=0)[:,0]], 0)]
 
+    # Cilinder lines, y-axis aligned (dimension index 1)
     lines = [inters(region, Polytope(np.array([[-v[0], 1, 0],
                                                     [v[0], -1, 0]])))
              for v in vs]
     free = []
 
     for i in range(len(lines) - 1):
+        # Cilinder
         cil = conv(lines[i:i+2])
+        # Obstacles in cilinder
         cobsts = inters_to_union(cil, obsts)
+        # Exteriors of the obstacles in the cilinder
         exts = [exterior(obs, cil) for obs in cobsts if len(obs.lin_set) == 0]
         if len(exts) == 0:
+            # Cilinder is all free space
             free.append(cil)
         elif len(exts) == 1:
+            # Only one obstacle contributing
             free.extend(exts[0])
         else:
+            # Intersections of all combinations of exteriors
             frees = [inters(*tup) for tup in it.product(*exts)]
-            free.extend(x for x in frees if not cdd.pempty(x))
+            # Avoid including lines or points (pfulldim)
+            free.extend(x for x in frees if cdd.pfulldim(x))
 
     return free
 

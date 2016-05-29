@@ -99,6 +99,9 @@ def pempty(m):
     m.obj_type = cdd.LPObjType.NONE
     return lp.status == cdd.LPStatusType.INCONSISTENT
 
+def pfulldim(m):
+    return len(m.lin_set) == 0 and not pempty(m)
+
 def pinters(*args):
     if len(args) == 0:
         raise Exception("Need at least one argument")
