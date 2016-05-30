@@ -99,8 +99,8 @@ class DRMotion(object):
                 return b_tree, last
             except DRHNoModel:
                 pass
-            except DRMNotConnected:
-                pass
+            except DRMNotConnected as e:
+                self.explored.insert(0, e.tree_progress)
 
             i += 1
 
