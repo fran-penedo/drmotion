@@ -1,4 +1,4 @@
-from util import Box, Polytope, Ellipsoid2D, cdecomp, conv, adj_matrix
+from util import Box, Polytope, Ellipsoid2D, cdecomp, conv, adj_matrix, expansion
 import numpy as np
 import cddwrap as cdd
 from multimethods import multimethod
@@ -64,11 +64,12 @@ def drh_connect(init, goal, region, obsts, t_max, x_label="x", decomp=False):
     print >>out, "[0, {0}] time;".format(t_max)
     print >>out, "[0, 3.15] z;"
 
+    expanded_obsts = [expansion(obs, 0.001) for obs in obsts]
     if decomp:
         if region.n > 2:
             raise Exception()
         r = conv([init, goal])
-        dec = [init] + cdecomp(r, obsts) + [goal]
+        dec = [init] + cdecomp(r, expanded_obsts) + [goal]
         jumps = adj_matrix(dec)
         for i, invt in enumerate(dec):
             print >>out, drh_mode(i, x_label, invt, jumps)

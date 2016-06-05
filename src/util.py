@@ -75,6 +75,11 @@ class Box(object):
     def corners(self):
         return np.array(list(it.product(*self.constraints)))
 
+    def expansion(self, eps):
+        cons = self.constraints.copy()
+        cons = cons + np.array([-eps, eps])
+        return Box(cons)
+
 
 class Polytope(cdd.CDDMatrix):
 
@@ -96,6 +101,11 @@ class Polytope(cdd.CDDMatrix):
     @property
     def n(self):
         return self.col_size - 1
+
+    def expansion(self, eps):
+        cons = np.array(self._m)
+        cons[:,0] += eps
+        return Polytope(cons)
 
 
 def inters(*args):
@@ -227,30 +237,38 @@ def cover(contain, exclude, epsilon):
         cons[i] = np.array([mins[i], c[1]])
         innerb_contain = contain[innerb.contains(contain)]
         if len(innerb_contain) > 0:
-            dmax = (max([x for x in innerb_contain[:, i]]))
-            c[1] = dmax
-            boxes[i*2 + 1].constraints[i, 1] = dmax
-            for b in boxes[(i+1)*2 :]:
-                b.constraints[i, 0] = dmax
+            dmax = (max([x for x in innerb_contain[:, i]]) + c[0]) / 2.0
+            # dmax = (max([x for x in innerb_contain[:, i]]))
+        else:
+            dmax = mins[i]
+        boxes[i*2 + 1].constraints[i, 1] = dmax
+        for b in boxes[(i+1)*2 :]:
+            b.constraints[i, 0] = dmax
+
 
         cons[i] = np.array([c[0], maxs[i]])
         innerb_contain = contain[innerb.contains(contain)]
         if len(innerb_contain) > 0:
-            dmin = (min([x for x in innerb_contain[:, i]]))
-            c[0] = dmin
-            boxes[i*2].constraints[i, 0] = dmin
-            for b in boxes[(i+1)*2 :]:
-                b.constraints[i, 1] = dmin
+            # dmin = (min([x for x in innerb_contain[:, i]]))
+            dmin = (min([x for x in innerb_contain[:, i]]) + c[1]) / 2.0
+        else:
+            dmin = maxs[i]
+        boxes[i*2].constraints[i, 0] = dmin
+        for b in boxes[(i+1)*2 :]:
+            b.constraints[i, 1] = dmin
 
         cons[i] = np.array([dmax + 0.001, dmin - 0.001])
 
+    nemptyboxes = []
     for b in boxes:
-        if np.any(np.isclose(b.constraints[:, 0] - b.constraints[:, 1], 0)) or \
-                not np.any(b.contains(contain)):
-            boxes.remove(b)
+        print b.constraints
+        if not np.any(np.isclose(b.constraints[:, 0] - b.constraints[:, 1], 0)) \
+                and np.any(b.contains(contain)):
+            nemptyboxes.append(b)
+    boxes = nemptyboxes
 
     # Recursive step: region = red box
-    rbox = Box(rcons)
+    rbox = Box(cons)
     ncontain = contain[rbox.contains(contain)]
     nexclude = exclude[rbox.contains(exclude)]
     nboxes = cover(ncontain, nexclude, epsilon)
@@ -299,6 +317,13 @@ def contains(s, e):
     else:
         raise Exception("Not implemented")
 
+@multimethod(Box, float)
+def expansion(b, eps):
+    return b.expansion(eps)
+
+@multimethod(Polytope, float)
+def expansion(p, eps):
+    return p.expansion(eps)
 
 def cdecomp(region, obsts):
     # Obstacles in region

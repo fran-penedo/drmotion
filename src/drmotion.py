@@ -100,6 +100,8 @@ class DRMotion(object):
             except DRHNoModel:
                 pass
             except DRMNotConnected as e:
+                b_tree = Tree(p[1])
+                a_tree.add_child(b_tree)
                 self.explored.insert(0, e.tree_progress)
 
             i += 1
