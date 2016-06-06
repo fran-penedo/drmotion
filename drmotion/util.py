@@ -179,6 +179,13 @@ class Ellipsoid2D(object):
         else:
             return False
 
+def cover_split(cons, contain, exclude, epsilon):
+    dsplit = np.argmax(cons[:,1] - cons[:,0])
+    theta = (cons[dsplit, 1] + cons[dsplit, 0]) / 2
+    return cover(contain[contain[:,dsplit] < theta],
+                    exclude[exclude[:,dsplit] < theta], epsilon) + \
+            cover(contain[contain[:,dsplit] >= theta],
+                    exclude[exclude[:,dsplit] >= theta], epsilon)
 
 def cover(contain, exclude, epsilon):
     # Base cases
@@ -188,8 +195,7 @@ def cover(contain, exclude, epsilon):
         return [Box(np.vstack([contain, contain]).T)]
 
     # Blue box
-    mins = np.min(contain, axis=0)
-    maxs = np.max(contain, axis=0)
+    mins, maxs = np.min(contain, axis=0), np.max(contain, axis=0)
     cons = np.vstack([mins, maxs]).T
     box = Box(cons.copy())
 
@@ -203,19 +209,13 @@ def cover(contain, exclude, epsilon):
         return [box]
 
     # Red box
-    rmins = np.min(exclude, axis=0)
-    rmaxs = np.max(exclude, axis=0)
+    rmins, rmaxs = np.min(exclude, axis=0), np.max(exclude, axis=0)
     rcons = np.vstack([rmins, rmaxs]).T
 
     # Red box too similar to blue box
     if np.all(cons - rcons < epsilon):
         # Split on largest dimension's middle point
-        dsplit = np.argmax(cons[:,1] - cons[:,0])
-        theta = (cons[dsplit, 1] + cons[dsplit, 0]) / 2
-        return cover(contain[contain[:,dsplit] < theta],
-                     exclude[exclude[:,dsplit] < theta], epsilon) + \
-                cover(contain[contain[:,dsplit] >= theta],
-                     exclude[exclude[:,dsplit] >= theta], epsilon)
+        return cover_split(cons, contain, exclude, epsilon)
 
     n = contain.shape[1]
     boxes = []
@@ -261,7 +261,6 @@ def cover(contain, exclude, epsilon):
 
     nemptyboxes = []
     for b in boxes:
-        print b.constraints
         if not np.any(np.isclose(b.constraints[:, 0] - b.constraints[:, 1], 0)) \
                 and np.any(b.contains(contain)):
             nemptyboxes.append(b)
