@@ -1,7 +1,7 @@
-from util import *
+from drmotion.util import *
 import numpy as np
 import nose.tools as nt
-import cddwrap as cdd
+import drmotion.cddwrap as cdd
 
 def nodes_test():
     t = Tree(1)

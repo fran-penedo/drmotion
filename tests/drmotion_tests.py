@@ -1,6 +1,6 @@
-from drmotion import *
+from drmotion.drmotion import *
 import numpy as np
-from util import Box, Polytope
+from drmotion.util import Box, Polytope
 
 def drm_test():
     cons = Box(np.array([[0, 10], [0, 10]]))

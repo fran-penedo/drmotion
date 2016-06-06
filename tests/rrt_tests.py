@@ -1,6 +1,6 @@
-from rrt import *
-from util import Box, Polytope
-import util
+from drmotion.rrt import *
+from drmotion.util import Box, Polytope
+import drmotion.util as util
 import numpy as np
 import nose.tools as nt
 import matplotlib.pyplot as plt

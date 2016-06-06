@@ -1,4 +1,4 @@
-from dreal import *
+from drmotion.dreal import *
 import numpy as np
 import nose.tools as nt
 
@@ -15,8 +15,8 @@ def c_shape_box_test():
     nt.assert_equal(c, "(and (and (x_0 >= 1) (x_0 <= 2)) (and (x_1 >= 2) (x_1 <= 3)))")
 
 def drh_check_sat_test():
-    sat = "test/drh_sat.drh"
-    unsat = "test/drh_unsat.drh"
+    sat = "tests/drh_sat.drh"
+    unsat = "tests/drh_unsat.drh"
 
     with open(sat, 'r') as f:
         drh = f.read()
