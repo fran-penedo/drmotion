@@ -220,44 +220,31 @@ def cover(contain, exclude, epsilon):
     n = contain.shape[1]
     boxes = []
 
-    for i in range(n):
-        # FIXME Maybe middle point
-        dmin = (min([x for x in contain[:, i] if x >= rmaxs[i]])) # + rmaxs[i]) / 2.0
-        cons[i] = np.array([dmin, maxs[i]])
-        boxes.append(Box(cons.copy()))
-        dmax = (max([x for x in contain[:, i] if x <= rmins[i]])) # + rmins[i]) / 2.0
-        cons[i] = np.array([mins[i], dmax])
-        boxes.append(Box(cons.copy()))
-        cons[i] = np.array([dmax, dmin])
-
     # innerb changes if cons changes
-    innerb = Box(cons)
+    innerb = Box(rcons)
     for i in range(n):
-        c = cons[i].copy()
-        cons[i] = np.array([mins[i], c[1]])
+        c = rcons[i].copy()
+
+        rcons[i] = np.array([mins[i], c[0]])
         innerb_contain = contain[innerb.contains(contain)]
         if len(innerb_contain) > 0:
             dmax = (max([x for x in innerb_contain[:, i]]) + c[0]) / 2.0
-            # dmax = (max([x for x in innerb_contain[:, i]]))
         else:
             dmax = mins[i]
-        boxes[i*2 + 1].constraints[i, 1] = dmax
-        for b in boxes[(i+1)*2 :]:
-            b.constraints[i, 0] = dmax
+        cons[i] = np.array([mins[i], dmax])
+        boxes.append(Box(cons.copy()))
 
-
-        cons[i] = np.array([c[0], maxs[i]])
+        rcons[i] = np.array([c[1], maxs[i]])
         innerb_contain = contain[innerb.contains(contain)]
         if len(innerb_contain) > 0:
-            # dmin = (min([x for x in innerb_contain[:, i]]))
             dmin = (min([x for x in innerb_contain[:, i]]) + c[1]) / 2.0
         else:
             dmin = maxs[i]
-        boxes[i*2].constraints[i, 0] = dmin
-        for b in boxes[(i+1)*2 :]:
-            b.constraints[i, 1] = dmin
+        cons[i] = np.array([dmin, maxs[i]])
+        boxes.append(Box(cons.copy()))
 
-        cons[i] = np.array([dmax + 0.001, dmin - 0.001])
+        cons[i] = np.array([dmax, dmin])
+        rcons[i] = np.array([dmax + 0.001, dmin - 0.001])
 
     nemptyboxes = []
     for b in boxes:
@@ -267,7 +254,7 @@ def cover(contain, exclude, epsilon):
     boxes = nemptyboxes
 
     # Recursive step: region = red box
-    rbox = Box(cons)
+    rbox = Box(rcons)
     ncontain = contain[rbox.contains(contain)]
     nexclude = exclude[rbox.contains(exclude)]
     nboxes = cover(ncontain, nexclude, epsilon)
