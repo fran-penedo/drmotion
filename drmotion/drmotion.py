@@ -4,6 +4,14 @@ import rrt
 from util import Tree, cover, faces, extend, contains, Box
 import util
 from dreal import drh_connect_pair, DRHNoModel
+import logging
+logger = logging.getLogger("DRM")
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(levelname)s %(module)s:%(lineno)d:%(funcName)s: %(message)s')
+handler.setFormatter(formatter)
+# logger.addHandler(handler)
+
+logger.setLevel(logging.DEBUG)
 
 class DRMotion(object):
     def __init__(self, constraints, obstacles, dx, eps, t_max, explored=None):

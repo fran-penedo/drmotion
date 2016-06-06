@@ -2,6 +2,8 @@ from drmotion.util import *
 import numpy as np
 import nose.tools as nt
 import drmotion.cddwrap as cdd
+import logging
+logger = logging.getLogger("DRM")
 
 def nodes_test():
     t = Tree(1)
@@ -67,7 +69,46 @@ def cover_test():
     epsilon = 0.1
 
     boxes = cover(contain, exclude, epsilon)
-    plot_boxes(boxes, contain, exclude)
+    logger.debug("Not covered")
+    for x in contain:
+        covered = False
+        for b in boxes:
+            if b.contains(x):
+                covered = True
+                break
+        if not covered:
+            logger.debug(x)
+    # plot_boxes(boxes, contain, exclude)
+    nt.assert_false(any(np.any(
+        np.vstack([box.contains(exclude) for box in boxes]), axis=0)))
+    nt.assert_true(all(np.any(
+        np.vstack([box.contains(contain) for box in boxes]), axis=0)))
+
+def cover2_test():
+    n = 2
+    contain = np.random.random((100, n))
+    # exclude = np.random.random((50, n))
+    exclude = np.array([[0.4, 0.4],
+                        [0.4, 0.45],
+                        [0.4, 0.5],
+                        [0.4, 0.55],
+                        [0.4, 0.6],
+                        [0.45, 0.6],
+                        [0.5, 0.6],
+                        [0.55, 0.6],
+                        [0.6, 0.6],
+                        [0.6, 0.55],
+                        [0.6, 0.5],
+                        [0.6, 0.45],
+                        [0.6, 0.4],
+                        [0.55, 0.4],
+                        [0.5, 0.4],
+                        [0.45, 0.4]
+                        ])
+    epsilon = 0.1
+
+    boxes = cover(contain, exclude, epsilon)
+    # plot_boxes(boxes, contain, exclude)
     nt.assert_false(any(np.any(
         np.vstack([box.contains(exclude) for box in boxes]), axis=0)))
     nt.assert_true(all(np.any(
