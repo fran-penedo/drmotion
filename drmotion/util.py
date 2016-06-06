@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import itertools as it
 from multimethods import multimethod
+import logging
+logger = logging.getLogger("DRM")
 
 class Tree(object):
     def __init__(self, node=None):
@@ -162,10 +164,10 @@ class Ellipsoid2D(object):
             if vrep.shape == (2, 2):
                 z = vrep[0] - vrep[1]
                 w = vrep[1] - self.v
-                print vrep
-                print z
-                print w
-                print self.A
+                logger.debug(vrep)
+                logger.debug(z)
+                logger.debug(w)
+                logger.debug(self.A)
                 return (z.dot(self.A).dot(w))**2 >= \
                     (z.dot(self.A).dot(z))*(w.dot(self.A).dot(w) - 1)
             else:

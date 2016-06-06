@@ -8,6 +8,8 @@ import re
 import os
 from os import path
 import tempfile
+import logging
+logger = logging.getLogger("DRM")
 
 LIB_DIR = path.join(path.dirname(__file__), '../lib')
 DREACH = path.join(LIB_DIR, 'dReal', 'bin', 'dReach')
@@ -131,9 +133,10 @@ def drh_check_sat(drh, k=0):
     elif outlines[-1].endswith("unsat."):
         return False, out
     else:
-        print drh
-        print out
-        print err
+        logger.debug("Unexpeted dreal output")
+        logger.debug(drh)
+        logger.debug(out)
+        logger.debug(err)
         raise Exception()
 
 def drh_connect_pair(init, goal, region, obsts, t_max, decomp=False):

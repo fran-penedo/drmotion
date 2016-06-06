@@ -136,7 +136,7 @@ def exterior_test():
     region = conv_pts(np.array([[0, 0], [0, 1], [1, 1], [1, 0]]))
     obst = conv_pts(np.array([[.2, .2], [.4, .4], [.4, .2], [.2, .4]]))
     ext = exterior(obst, region)
-    print len(ext)
+    logger.debug(len(ext))
 
 def cdecomp_test():
     region = conv_pts(np.array([[0, 0], [0, 1], [1, 1], [1, 0]]))

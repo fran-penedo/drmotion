@@ -1,6 +1,8 @@
 from drmotion.dreal import *
 import numpy as np
 import nose.tools as nt
+import logging
+logger = logging.getLogger("DRM")
 
 def c_minmax_test():
     v = "x"
@@ -46,8 +48,8 @@ def drh_connect_test():
     drh = drh_connect(init, goal, region, [obst1, obst3], t_max)
     res, out = drh_check_sat(drh)
 
-    # print drh
-    # print out
+    logger.debug(drh)
+    logger.debug(out)
 
     # nt.assert_false(res)
 
@@ -61,6 +63,6 @@ def drh_connect_dec_test():
     drh = drh_connect(init, goal, region, [obst1], t_max, "x", True)
     res, out = drh_check_sat(drh, k=10)
 
-    print drh
-    print out
+    logger.debug(drh)
+    logger.debug(out)
     nt.assert_true(res)
