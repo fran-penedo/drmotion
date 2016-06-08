@@ -13,115 +13,97 @@ handler.setFormatter(formatter)
 
 logger.setLevel(logging.DEBUG)
 
-class DRMotion(object):
-    def __init__(self, constraints, obstacles, dx, eps, t_max, explored=None):
-        self.constraints = constraints
-        self.obstacles = obstacles
-        self.dx = dx
-        self.eps = eps
-        self.t_max = t_max
-        self.iters = 50
-        if explored is None:
-            self.explored = []
+def build_tree(region, obstacles, x_init, goal, dx, eps, t_max, iters=50):
+    return expand_tree(region, obstacles, Tree(x_init), goal, dx, eps, t_max,
+                       [], iters)
+
+def expand_tree(region, obstacles, t, goal, dx, eps, t_max, explored=None,
+               iters=50):
+    cur = t
+
+    while not contains(goal, cur.node):
+        cur = explore(region, obstacles, t, goal, dx, iters)
+        if contains(goal, cur.node):
+            break
+
+        if isinstance(goal, Box):
+            exclude = goal.corners()
         else:
-            self.explored = explored
+            exclude = goal
+        if len(explored) > 0:
+            exclude = np.vstack([exclude] + [x.nodes() for x in explored])
 
-    def build_tree(self, x_init, goal, t_init=None):
-        if t_init is None:
-            t = Tree(x_init)
-        else:
-            t = t_init
-        cur = t
+        exp_region = cover(np.array(t.nodes()), exclude, eps)
+        # util.plot_casestudy2(region, goal, obstacles, t, region)
+        try:
+            cur, explored_tree = connect_to_expansion(
+                exp_region, region, obstacles, t, goal, dx, eps, t_max,
+                explored, iters)
+            if any(contains(goal, x) for x in explored_tree.nodes()):
+                    cur = explored_tree.find(
+                        next(x for x in explored_tree.nodes()
+                            if contains(goal, x)))
+                    break
 
-        while not contains(goal, np.array(cur.node)):
-            # print "DRM iteration"
-            cur = self.explore(t, goal, self.iters)
-            if contains(goal, np.array(cur.node)):
-                break
+        except DRMNotConnected:
+            raise DRMNotConnected(t)
 
-            if isinstance(goal, Box):
-                exclude = goal.corners()
+    return t, cur
+
+def connect_to_expansion(exp_region, region, obstacles, t, goal, dx, eps,
+                         t_max, explored, iters):
+    for face, direction, box in faces(exp_region):
+        try:
+            obs = obstacles + \
+                [b.aspoly() for b in exp_region if b is not box]
+            a, b = drh_connect_pair(
+                face.aspoly(), extend(face, direction, eps).aspoly(),
+                region, obs, t_max, True)
+            util.plot_casestudy3(region, goal, obstacles, t, exp_region, np.vstack([a,b]))
+
+            last = rrt.connect(a, np.array(t.nodes()), region, obstacles)
+            a_tree = Tree(a)
+            if last is not None:
+                last = Tree(last)
+                a_tree.add_child(last)
             else:
-                exclude = goal
-            if len(self.explored) > 0:
-                exclude = [exclude]
-                exclude.extend([x.nodes() for x in self.explored])
-                exclude = np.vstack(exclude)
+                connect_to_explored(a_tree, explored, region, obstacles)
+                # a_tree's root is a, last is in t
+                a_tree, last = expand_tree(
+                    region, obstacles, a_tree, np.vstack(t.nodes()), dx, eps, t_max,
+                    [t] + explored, iters)
 
-            region = cover(np.array(t.nodes()), exclude, self.eps)
-            # util.plot_casestudy2(self.constraints, goal, self.obstacles, t, region)
-            try:
-                cur, explored_tree = self.connect_to_expansion(region, t, goal)
-                if any(contains(goal, np.array(x))
-                                for x in explored_tree.nodes()):
-                       cur = explored_tree.find(next(x for x in explored_tree.nodes()
-                                  if contains(goal, np.array(x))))
-                       break
+            last.make_root()
+            t.find(last.node).add_children(last.children)
+            b_tree = Tree(b)
+            a_tree.add_child(b_tree)
+            return b_tree, last
+        except DRHNoModel:
+            pass
+        except DRMNotConnected as e:
+            b_tree = Tree(b)
+            a_tree.add_child(b_tree)
+            explored.insert(0, e.tree_progress)
 
-            except DRMNotConnected:
-                raise DRMNotConnected(t)
+    raise DRMNotConnected(t)
 
-        return t, cur
+def connect_to_explored(a_tree, explored, region, obstacles):
+    for e in explored:
+        conn_explored = rrt.connect(a_tree.node, np.array(e.nodes()),
+                            region, obstacles)
+        if conn_explored is not None:
+            ecopy = e.copy()
+            ecopy.find(conn_explored).add_child(a_tree)
+            a_tree.make_root()
+            explored.remove(e)
+            break
 
-    def connect_to_expansion(self, region, t, goal):
-        i = 0
-        for f, d, b in faces(region):
-            try:
-                obs = self.obstacles + [box.aspoly() for box in region if box is not b]
-                # print "Trying face " + str(i)
-                p = drh_connect_pair(f.aspoly(), extend(f, d, self.eps).aspoly(),
-                                     self.constraints,
-                                     obs, self.t_max, True)
-                util.plot_casestudy3(self.constraints, goal, self.obstacles, t, region, p)
-                # print "Pair obtained"
-
-                last = rrt.connect(p[0], np.array(t.nodes()),
-                                   self.constraints, self.obstacles)
-                if last is not None:
-                    a_tree = Tree(p[0])
-                    last = Tree(last)
-                    a_tree.add_child(last)
-                else:
-                    a_tree = Tree(p[0])
-                    for e in self.explored:
-                        conn_explored = rrt.connect(p[0], np.array(e.nodes()),
-                                            self.constraints, self.obstacles)
-                        if conn_explored is not None:
-                            ecopy = e.copy()
-                            ecopy.find(conn_explored).add_child(a_tree)
-                            a_tree.make_root()
-                            self.explored.remove(e)
-                            break
-
-                    exp = [t] + self.explored
-
-                    drm = DRMotion(self.constraints, self.obstacles, self.dx, self.eps,
-                                    self.t_max, exp)
-                    # a_tree's root is p[0], last is in t
-                    a_tree, last = drm.build_tree(None, np.array(t.nodes()), a_tree)
-
-                last.make_root()
-                t.find(last.node).add_children(last.children)
-                b_tree = Tree(p[1])
-                a_tree.add_child(b_tree)
-                return b_tree, last
-            except DRHNoModel:
-                pass
-            except DRMNotConnected as e:
-                b_tree = Tree(p[1])
-                a_tree.add_child(b_tree)
-                self.explored.insert(0, e.tree_progress)
-
-            i += 1
-
-        raise DRMNotConnected(t)
-
-    def explore(self, t, goal, iters):
-        # print "Exploring"
-        rrt = RRT(self.constraints, self.obstacles, self.dx)
-        _, cur = rrt.build_tree(None, goal, t, iters)
-        # print "Finished exploring"
-        return cur
+def explore(region, obstacles, t, goal, dx, iters):
+    # print "Exploring"
+    rrt = RRT(region, obstacles, dx)
+    _, cur = rrt.build_tree(None, goal, t, iters)
+    # print "Finished exploring"
+    return cur
 
 
 class DRMNotConnected(Exception):
