@@ -1,7 +1,9 @@
 from drmotion import *
 import numpy as np
-from util import Box, Polytope
+from util import Box, Polytope, grid_obsts, gen_grid
 from timeit import default_timer as timer
+import logging
+logger = logging.getLogger("DRM")
 
 def bench1():
     print "Bench 1"
@@ -66,7 +68,15 @@ def bench2():
     print "drm times: max {0} min {1} avg {2}".format(
         max(drm_times), min(drm_times), sum(drm_times) / float(its))
 
+def bench3():
+    logger.info("Benchmark 3: Random obstacles in grid")
+    region = Box(np.array([[0, 10], [0, 10]]))
+    obstacles = [o.aspoly() for o in grid_obsts(gen_grid(10, 0.2))]
+    x_init = np.array([0.5, 0.5])
+    goal = Box(np.array([[9, 10], [9, 10]]))
+
+    t, cur = build_tree(region, obstacles, x_init, goal, 1, 0.5, 1)
+
 
 if __name__ == "__main__":
-    bench1()
-    bench2()
+    bench3()

@@ -361,6 +361,37 @@ def adj_matrix(pols):
                     m[j,i] = ints
     return m
 
+
+def gen_grid(n, dens):
+    g = np.random.binomial(1, dens, size=(n, n))
+    a = np.identity(2, dtype=int)
+    b = np.vstack([a[1], a[0]])
+    a_choice = np.array([[1, 0], [0, 1]])
+    b_choice = np.array([[1, 1], [0, 0]])
+    changed = True
+    while changed:
+        changed = False
+        for i in range(n-1):
+            for j in range(n-1):
+                if np.array_equal(g[i:i+2, j:j+2], a):
+                    g[tuple([i,j] + a_choice[np.random.randint(2)])] = 1
+                    changed = True
+                if np.array_equal(g[i:i+2, j:j+2], b):
+                    g[tuple([i,j] + b_choice[np.random.randint(2)])] = 1
+                    changed = True
+
+    return g
+
+def grid_obsts(g):
+    obsts = []
+    for i in range(g.shape[0]):
+        for j in range(g.shape[1]):
+            if g[i,j] == 1:
+                obsts.append(Box(np.array([[j, j+1], [i, i+1]])))
+
+    return obsts
+
+
 def plot_boxes(boxes, include, exclude):
     fig = plt.figure()
     ax = fig.add_subplot(111)

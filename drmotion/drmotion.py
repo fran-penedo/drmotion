@@ -9,7 +9,7 @@ logger = logging.getLogger("DRM")
 handler = logging.StreamHandler()
 formatter = logging.Formatter('%(levelname)s %(module)s:%(lineno)d:%(funcName)s: %(message)s')
 handler.setFormatter(formatter)
-# logger.addHandler(handler)
+logger.addHandler(handler)
 
 logger.setLevel(logging.DEBUG)
 
