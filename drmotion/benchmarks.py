@@ -71,11 +71,18 @@ def bench2():
 def bench3():
     logger.info("Benchmark 3: Random obstacles in grid")
     region = Box(np.array([[0, 10], [0, 10]]))
-    obstacles = [o.aspoly() for o in grid_obsts(gen_grid(10, 0.2))]
+    grid = gen_grid(10, 0.2)
+    grid[0, 0] = 0
+    grid[9, 9] = 1
+    obstacles = [o.aspoly() for o in grid_obsts(grid)]
     x_init = np.array([0.5, 0.5])
     goal = Box(np.array([[9, 10], [9, 10]]))
 
-    t, cur = build_tree(region, obstacles, x_init, goal, 1, 0.5, 1)
+    try:
+        t, cur = build_tree(region, obstacles, x_init, goal, 1, 0.5, 1)
+        logger.info("Path obtained")
+    except:
+        logger.info("No path exists")
 
 
 if __name__ == "__main__":

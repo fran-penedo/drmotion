@@ -25,6 +25,10 @@ def expand_tree(region, obstacles, t, goal, dx, eps, t_max, explored=None,
         cur = explore(region, obstacles, t, goal, dx, iters)
         if contains(goal, cur.node):
             break
+        for node in t.flat():
+            if connect_to_explored(node, explored, region, obstacles):
+                logger.debug("Connected")
+                break
 
         if isinstance(goal, Box):
             exclude = goal.corners()
@@ -33,6 +37,8 @@ def expand_tree(region, obstacles, t, goal, dx, eps, t_max, explored=None,
         if len(explored) > 0:
             exclude = np.vstack([exclude] + [x.nodes() for x in explored])
 
+        logger.debug("Included:\n{}".format(np.array(t.nodes()).__repr__()))
+        logger.debug("Exluded:\n{}".format(exclude.__repr__()))
         exp_region = cover(np.array(t.nodes()), exclude, eps)
         # util.plot_casestudy2(region, goal, obstacles, t, region)
         try:
@@ -88,15 +94,19 @@ def connect_to_expansion(exp_region, region, obstacles, t, goal, dx, eps,
     raise DRMNotConnected(t)
 
 def connect_to_explored(a_tree, explored, region, obstacles):
+    connected = False
     for e in explored:
         conn_explored = rrt.connect(a_tree.node, np.array(e.nodes()),
                             region, obstacles)
         if conn_explored is not None:
+            parent = a_tree.parent
             ecopy = e.copy()
             ecopy.find(conn_explored).add_child(a_tree)
             a_tree.make_root()
+            a_tree.parent = parent
             explored.remove(e)
-            break
+            connected = True
+    return connected
 
 def explore(region, obstacles, t, goal, dx, iters):
     # print "Exploring"

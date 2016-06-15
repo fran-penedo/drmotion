@@ -63,6 +63,6 @@ def drh_connect_dec_test():
     drh = drh_connect(init, goal, region, [obst1], t_max, "x", True)
     res, out = drh_check_sat(drh, k=10)
 
-    logger.debug(drh)
-    logger.debug(out)
+    # logger.debug(drh)
+    # logger.debug(out)
     nt.assert_true(res)

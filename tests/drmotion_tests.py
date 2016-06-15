@@ -46,4 +46,4 @@ def drm4_test():
 
     t, cur = build_tree(cons, obstacles, x_init, goal, 1, 0.5, 1)
 
-drm4_test.slow = 0
+drm4_test.slow = 1

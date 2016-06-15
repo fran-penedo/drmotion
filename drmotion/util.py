@@ -26,8 +26,21 @@ class Tree(object):
         self.children.remove(x)
 
     def nodes(self):
-        return [self.node] + [n for nodes in [c.nodes() for c in self.children]
-                              for n in nodes]
+        """Returns a list of the nodes of the tree"""
+        # return [self.node] + [n for nodes in [c.nodes() for c in self.children]
+        #                       for n in nodes]
+        return self.traverse(lambda x: x.node)
+
+    def flat(self):
+        """Returns the tree in a flat list"""
+        # return [self] + [n for nodes in [c.flat() for c in self.children]
+        #                       for n in nodes]
+        return self.traverse(lambda x: x)
+
+    def traverse(self, f):
+        """Returns the tree mapped through f : Tree -> a, as a flat list"""
+        return [f(self)] + [n for nodes in [c.traverse(f) for c in self.children]
+                            for n in nodes]
 
     def make_root(self):
         if self.parent is not None:
@@ -75,7 +88,7 @@ class Box(object):
         return Polytope(m)
 
     def corners(self):
-        return np.array(list(it.product(*self.constraints)))
+        return np.array(list(it.product(*self.constraints)), dtype=float)
 
     def expansion(self, eps):
         cons = self.constraints.copy()
@@ -164,10 +177,10 @@ class Ellipsoid2D(object):
             if vrep.shape == (2, 2):
                 z = vrep[0] - vrep[1]
                 w = vrep[1] - self.v
-                logger.debug(vrep)
-                logger.debug(z)
-                logger.debug(w)
-                logger.debug(self.A)
+                # logger.debug(vrep)
+                # logger.debug(z)
+                # logger.debug(w)
+                # logger.debug(self.A)
                 return (z.dot(self.A).dot(w))**2 >= \
                     (z.dot(self.A).dot(z))*(w.dot(self.A).dot(w) - 1)
             else:
@@ -387,7 +400,7 @@ def grid_obsts(g):
     for i in range(g.shape[0]):
         for j in range(g.shape[1]):
             if g[i,j] == 1:
-                obsts.append(Box(np.array([[j, j+1], [i, i+1]])))
+                obsts.append(Box(np.array([[j, j+1], [i, i+1]], dtype=float)))
 
     return obsts
 
